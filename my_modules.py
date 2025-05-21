@@ -8,30 +8,39 @@ from lightgbm import LGBMClassifier
 
 
 def common_process(df):
-    # データリークの恐れのある特徴量の削除
-    df = df.drop(['time_diff', 'time', 'corner1_rank', 'corner2_rank', 'corner3_rank', 'corner4_rank', 'last_3F_time', 'last_3F_rank', 'Ave_3F', 'PCI', 'last_3F_time_diff', "win_odds", "prize"], axis=1)
-    
     # fold用レースidを作成
     df["id_for_fold"] = df["race_id"] // 100 # 下二桁を捨てる
     df["id_for_fold"] = df["id_for_fold"].astype("category")
 
     # 時系列順に並び替え
+    place_dict = racecourses = {
+        "東京": 1,
+        "中山": 2,
+        "阪神": 3,
+        "中京": 4,
+        "京都": 5,
+        "新潟": 6,
+        "小倉": 7,
+        "福島": 8,
+        "札幌": 9,
+        "函館": 10
+        }
     df["year"] += 2000
+    df["place_num"] = df["place"].replace(place_dict)
     df["datetime"] = df["year"].astype(str) + \
         df["month"].astype(str).str.zfill(2) + \
         df["day"].astype(str).str.zfill(2) + \
-        df["times"].astype(str).str.zfill(2) + \
-        df["race_num"].astype(str).str.zfill(2)
+        df["race_num"].astype(str).str.zfill(2) + \
+        df["place_num"].astype(str).str.zfill(2)
     df["datetime"] = pd.to_datetime(df["datetime"], format="%Y%m%d%H%M")
     df = df.sort_values("datetime")
-    df = df.drop(["datetime"], axis=1)
+    df = df.drop(["datetime", "place_num"], axis=1)
 
     # 必要ない特徴量は削除
     df = df.drop(["race_id"], axis=1)
 
     # ターゲット変数の作成
     df["target"] = df["rank"].apply(lambda x: 1 if x == 1 else 0)
-    df = df.drop(["rank"], axis=1)
 
     return df
 
@@ -51,6 +60,7 @@ class GroupTimeSeriesSplit(BaseCrossValidator):
             raise ValueError("n_splits must be < n_groups")
 
         test_size = n_groups // (self.n_splits + 1)
+        s_groups = pd.Series(groups)
 
         for i in range(self.n_splits):
             train_end   = (i+1) * test_size
@@ -63,8 +73,8 @@ class GroupTimeSeriesSplit(BaseCrossValidator):
             else :
                 test_groups = unique_groups[test_start:]
             
-            train_idx = np.where(pd.Series(groups).isin(train_groups))[0]
-            test_idx  = np.where(pd.Series(groups).isin(test_groups))[0]
+            train_idx = np.where(s_groups.isin(train_groups))[0]
+            test_idx  = np.where(s_groups.isin(test_groups))[0]
 
             yield train_idx, test_idx
 
