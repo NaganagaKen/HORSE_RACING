@@ -1,14 +1,24 @@
 import pandas as pd
 import numpy as np
 from my_modules import GroupTimeSeriesSplit
+import matplotlib.pyplot as plt
+from IPython.display import display
 import optuna
-from sklearn.metrics import log_loss
+from sklearn.metrics import log_loss, roc_auc_score, accuracy_score, f1_score
 import lightgbm as lgb
 from lightgbm import LGBMClassifier
+import time
+import random
 
 
-def simple_lightGBM(df, feature_col):
+def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N.csv",
+                    n_trials=100, save_result=True):
     splitter = GroupTimeSeriesSplit(n_splits=5)
+    
+    # 乱数シードを固定
+    np.random.seed(42)
+    random.seed(42)
+
 
     # 確定パラメータの定義
     params = {
@@ -17,6 +27,7 @@ def simple_lightGBM(df, feature_col):
         "n_estimators": 1000,
         "n_jobs" : -1,
         "verbose" : -1,
+        "random_state" : 42
         }
 
     # データの前処理
@@ -25,61 +36,98 @@ def simple_lightGBM(df, feature_col):
         df[col] = df[col].astype("category")
 
     logloss_of_each_horse_N = []
-    models = []
 
-    # ---- ここから各horse_Nに対するループ ----
+    # ---- ここから学習開始 ----
 
-    # 各horse_Nごとにモデルを作成
-    for i in sorted(df.horse_N.unique().tolist()) :
-      print(f"Start tuning of horse_{i}")
+    # 訓練データ（パラメータチューニング用）とテストデータの分割
+    X, y = df.drop(["target"], axis=1), df["target"]
+    X_train, X_test, y_train, y_test = train_test_group_split(X, y, test_size=0.3)
 
-      df_horse_N = df[df.horse_N == i].copy()
+    # パラメータチューニング開始
+    objective = create_objective(X_train, y_train, splitter=splitter, feature_col=feature_col, params=params)
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=optuna.samplers.TPESampler(seed=42) # パラメータ探索範囲を確定するには、ここをランダムサンプラーにする。
+        )
+    study.optimize(objective, n_trials=n_trials) # 最適化の実行
 
-      # 訓練データ（パラメータチューニング用）とテストデータの分割
-      X, y = df_horse_N.drop(["target"], axis=1), df_horse_N["target"]
-      X_train, X_test, y_train, y_test = train_test_group_split(X, y, test_size=0.3)
+    # 調整後のパラメータの表示
+    print("Best params : ", study.best_params)
 
-      # パラメータチューニング開始
-      objective = create_objective(X_train, y_train, splitter=splitter, feature_col=feature_col, params=params)
-      study = optuna.create_study(
-          direction="minimize",
-          sampler=optuna.samplers.TPESampler() # パラメータ探索範囲を確定するには、ランダムサンプラーにする。
-          )
-      study.optimize(objective, n_trials=100) # 最適化の実行
+    # 可視化
+    if (visualization) :
+        optuna.visualization.plot_param_importances(study).show() # feature_importanceみたいなやつ
+        optuna.visualization.plot_slice(
+            study,
+            params=["max_bin", "num_leaves", "min_data_in_leaf", "min_sum_hessian_in_leaf",
+                    "bagging_fraction", "bagging_freq", "feature_fraction", "lambda_l1", "lambda_l2",
+                    "min_gain_to_split", "max_depth", "learning_rate", "path_smooth"]
+        ).show()
 
-      # 調整後のパラメータの表示
-      print("Best params : ", study.best_params)
+    # 全体を学習させる
+    kwargs = {**params, **study.best_params}
+    model = LGBMClassifier(**kwargs)
+    model.fit(X_train[feature_col], y_train)
+    pred = model.predict_proba(X_test[feature_col])[:, 1]
+    class_pred = model.predict(X_test[feature_col])
+    print("Sum of predict      is :", sum(class_pred))
+    print("Sum of predict rate is :", round(sum(class_pred)/len(class_pred), 10))
 
-      # 可視化
-      optuna.visualization.plot_param_importances(study).show() # feature_importanceみたいなやつ
-      optuna.visualization.plot_slice(
-          study,
-          params=["max_bin", "num_leaves", "min_data_in_leaf", "min_sum_hessian_in_leaf",
-                  "bagging_fraction", "bagging_freq", "feature_fraction", "lambda_l1", "lambda_l2",
-                  "min_gain_to_split", "max_depth", "learning_rate", "path_smooth"]
-      ).show()
+    # モデルの重要度を表示
+    importances = model.booster_.feature_importance(importance_type="gain")
+    feature_name = pd.Series(model.feature_name_)
+    indices = np.argsort(importances)[::-1] 
 
-      # 全体を学習させる
-      kwargs = {**params, **study.best_params}
-      model = LGBMClassifier(**kwargs)
-      model.fit(X[feature_col], y)
-      pred = model.predict_proba(X_test[feature_col])[:, 1]
-      models.append(tuple([i, model])) # 番号（horse_N）とmodelを格納
+    plt.figure(figsize=(16,8))
+    plt.title("Feature importances")
+    plt.bar(range(len(indices)), importances[indices])
+    plt.xticks(range(len(indices)), feature_name[indices], rotation=90)
 
-      # テストデータでloglossを計算
-      prob_calcurate = prob_calculator(X_test, pred)
-      logloss = log_loss(y_test, prob_calcurate["first_prize_prob"])
-      logloss_of_each_horse_N.append(tuple([i, logloss]))
+    plt.show()
 
-      print(f"End tuning of horse:{i}")
+    # テストデータで各horse_Nごとのloglossを計算
+    prob_calcurated_df = prob_calculator(X_test, pred)
+    prob_calcurated_df = prob_calcurated_df.set_index(X_test.index) 
+    for i in sorted(X.horse_N.unique().tolist()):
+        horse_N_index = X_test.horse_N == i
+        prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, "first_prize_prob"]
+        logloss_score = log_loss(y_test[horse_N_index], prob_calcurate_horse_N)
+        logloss_of_each_horse_N.append(tuple([i, logloss_score]))
 
-    # ---- ループ終了 ----
 
-    # 各horse_Nのloglossを表示
-    for i, logloss_score in logloss_of_each_horse_N:
-      print(f"logloss of horse_{i} : ", logloss_score)
+    # データを書き込み
+    if save_result:
+        old_scores = pd.read_csv(scores_path)
+        # 登録時間
+        now = time.ctime()
+        cnvtime = time.strptime(now)
+        current_score = [time.strftime("%Y/%m/%d %H:%M", cnvtime), memo]
+        # loglossスコア
+        logloss_list = [score for i, score in logloss_of_each_horse_N]
+        current_score.extend(logloss_list)
+        current_score.append(sum(logloss_list))
+        # accuracy
+        accuracyscore = accuracy_score(y_test, class_pred)
+        current_score.append(accuracyscore)
+        # f1-score
+        f1score = f1_score(y_test, class_pred)
+        current_score.append(f1score)
+        # auc
+        auc_score = roc_auc_score(y_test, class_pred)
+        current_score.append(auc_score)
 
-    return models
+        # DataFrameに変換
+        current_data_dict = dict()
+        data_col_name = old_scores.columns.tolist()
+        for data ,col_name in zip(current_score, data_col_name):
+            current_data_dict[col_name] = data
+        current_score_df = pd.DataFrame([current_data_dict])
+        update_scores = pd.concat([current_score_df, old_scores], ignore_index=True)
+        update_scores.to_csv("../Memo/logloss_score_of_each_horse_N.csv", index=False)
+        display(update_scores)
+
+
+    return model
 
 
 # objective関数を作る関数

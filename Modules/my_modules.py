@@ -14,22 +14,42 @@ def common_process(df):
     df_copy["id_for_fold"] = df_copy["id_for_fold"].astype("category")
 
     # コースの情報を記載（平地・障害、芝・ダート）
-    course_type_dict = {
-        10: '平地芝',
-        11: '平地芝',
-        12: '平地芝',
-        17: '平地芝',
-        18: '平地芝',
-        21: '平地芝',
-        23: '平地ダート',
-        24: '平地ダート',
-        52: '障害芝ダート',
-        54: '障害芝',
-        55: '障害芝',
-        56: '障害芝',
-        57: '障害芝'
+    field_type_dict = {
+    10: "芝", 11: "芝", 12: "芝", 13: "芝", 14: "芝", 15: "芝", 16: "芝",
+    17: "芝", 18: "芝", 19: "芝", 20: "芝", 21: "芝", 22: "芝",
+    23: "ダート", 24: "ダート", 25: "ダート", 26: "ダート", 29: "ダート",
+    27: "サンド", 28: "サンド",
+    51: "芝", 52: "芝ダート", 53: "芝", 54: "芝", 55: "芝", 56: "芝", 57: "芝", 58: "芝", 59: "芝"
     }
-    df_copy["race_type"] = df_copy["track_code"].replace(course_type_dict)
+
+    df_copy["field_type"] = df_copy["track_code"].replace(field_type_dict)
+    
+    # レースのタイプ
+    race_type_dict = {
+    10: "平地", 11: "平地", 12: "平地", 13: "平地", 14: "平地", 15: "平地", 16: "平地",
+    17: "平地", 18: "平地", 19: "平地", 20: "平地", 21: "平地", 22: "平地",
+    23: "平地", 24: "平地", 25: "平地", 26: "平地", 27: "平地", 28: "平地", 29: "平地",
+    51: "障害", 52: "障害", 53: "障害", 54: "障害", 55: "障害", 56: "障害", 57: "障害", 58: "障害", 59: "障害"
+    }
+
+    df_copy["flat_or_jump"] = df_copy["track_code"].replace(race_type_dict)
+
+    # 右回り(R)・左回り(L)・直線(S)・障害レース(N)かを判定する
+    # 障害レースはかなり適当だから注意。後で直す
+    turn_type_dict = {
+    10: "S", 29: "S",  # 直線
+    11: "L", 12: "L", 13: "L", 14: "L", 15: "L", 16: "L", 23: "L", 25: "L", 27: "L", 53: "L",
+    17: "R", 18: "R", 19: "R", 20: "R", 21: "R", 22: "R", 24: "R", 26: "R", 28: "R",
+    51: "S",  # 襷コースは直線扱い（実際はジグザグだが一種の直線）
+    52: "L", 54: "L", 55: "L", 56: "L", 57: "L", 58: "L", 59: "L"
+    }
+    df_copy["turn_type"] = df_copy["track_code"].replace(turn_type_dict)
+
+
+    # レースを識別するための会場・（芝orダート）・距離という特徴量を作成
+    # 「阪神芝1600」みたいな特徴量ができる
+    df_copy["race_type"] = df_copy["place"] + df_copy["field_type"] + df_copy["dist"].astype(str) 
+
 
     # 時系列順に並び替え
     place_dict = {
@@ -43,7 +63,7 @@ def common_process(df):
         "福島": 8,
         "札幌": 9,
         "函館": 10
-        }
+    }
     df_copy["year"] += 2000
     df_copy["place_num"] = df_copy["place"].replace(place_dict).astype(int)
     df_copy["datetime"] = df_copy["year"].astype(str) + \
@@ -55,14 +75,11 @@ def common_process(df):
     df_copy = df_copy.sort_values("datetime")
     df_copy = df_copy.drop(["place_num"], axis=1)
 
-    # horse_N = 5,6,7 は少ないので、8頭立てにまとめる
-    df_copy["horse_N"] = df_copy["horse_N"].replace({5:8, 6:8, 7:8})
-
     # 必要ない特徴量は削除
     df_copy = df_copy.drop(["race_id"], axis=1)
 
     # とりあえず平地レースだけを使用
-    df_copy = df_copy[(df_copy.race_type == "平地芝") | (df_copy.race_type == "平地ダート")]
+    df_copy = df_copy[df_copy["flat_or_jump"] == "平地"]
 
     # カテゴリを示す数値列をカテゴリ列に変換
     to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code"]
@@ -71,10 +88,12 @@ def common_process(df):
 
     # ターゲット変数の作成
     df_copy["target"] = df_copy["rank"].apply(lambda x: 1 if x == 1 else 0)
+    df_copy["target3"] = df_copy["rank"].apply(lambda x: 1 if 1 <= x <= 3 else 0)
 
     return df_copy
 
 
+# 競馬用の時系列かつグループ単位でバリデーションを行うsplitter
 class GroupTimeSeriesSplit(BaseCrossValidator):
     def __init__(self, n_splits=5):
         self.n_splits = n_splits
