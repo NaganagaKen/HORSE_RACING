@@ -50,7 +50,7 @@ def common_process(df_to_copy):
     # 「阪神芝1600」みたいな特徴量ができる
     df["race_type"] = df["place"] + df["field_type"] + df["dist"].astype(str) 
 
-    #　内枠か外枠かを表す特徴量wakuを作成
+    # 内枠か外枠かを表す特徴量wakuを作成
     df["waku"] = df["waku_num"].apply(lambda x: "inner" if 1<=x<=4 else "outer")
 
 
