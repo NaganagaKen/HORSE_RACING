@@ -78,10 +78,10 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     feature_name = pd.Series(model.feature_name_)
     indices = np.argsort(importances)[::-1] 
 
-    plt.figure(figsize=(16,8))
+    plt.figure(figsize=(24,8))
     plt.title("Feature importances")
     plt.bar(range(len(indices)), importances[indices])
-    plt.xticks(range(len(indices)), feature_name[indices], rotation=90)
+    plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
 
     plt.show()
 
@@ -101,7 +101,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         # 登録時間
         now = time.ctime()
         cnvtime = time.strptime(now)
-        current_score = [time.strftime("%Y/%m/%d %H:%M", cnvtime), memo]
+        current_score = [time.strftime("%Y/%m/%d %H:%M", cnvtime), memo] # これにスコアを追加していく
         # loglossスコア
         logloss_list = [score for i, score in logloss_of_each_horse_N]
         current_score.extend(logloss_list)
@@ -190,20 +190,20 @@ def create_objective(X, y, splitter, feature_col, params):
 
 
 # 予測確率を正規化する関数
-def prob_calculator(df, prob):
-    df_copy = df.copy()
+def prob_calculator(df_to_copy, prob):
+    df = df_to_copy.copy()
 
     # 予測確率をクリッピングして、完全に0や1にならないようにする (LogLossの安定化)
     epsilon = 1e-15 # ごく小さい値
-    df_copy["unnormalized_prob"] = np.clip(prob, epsilon, 1 - epsilon)
+    df["unnormalized_prob"] = np.clip(prob, epsilon, 1 - epsilon)
     # FutureWarningを避けるためにobserved=Falseを追加
-    sum_prob = df_copy.groupby(["id_for_fold"], observed=False)["unnormalized_prob"].sum()
+    sum_prob = df.groupby(["id_for_fold"], observed=False)["unnormalized_prob"].sum()
     sum_prob = pd.DataFrame({"sum_prob": sum_prob})
-    df_copy = pd.merge(df_copy, sum_prob, how="left", on="id_for_fold")
-    df_copy["first_prize_prob"] = df_copy["unnormalized_prob"] / df_copy["sum_prob"]
+    df = pd.merge(df, sum_prob, how="left", on="id_for_fold")
+    df["first_prize_prob"] = df["unnormalized_prob"] / df["sum_prob"]
 
-    df_copy = df_copy.drop(["unnormalized_prob", "sum_prob"], axis=1)
-    return df_copy
+    df = df.drop(["unnormalized_prob", "sum_prob"], axis=1)
+    return df
 
 
 # グループごとの訓練・テストデータの分割
