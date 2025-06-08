@@ -64,7 +64,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
                     "min_gain_to_split", "max_depth", "learning_rate", "path_smooth"]
         ).show()
 
-    # 全体を学習させる
+    # 訓練データ全体を学習させ、検証データを用いて予想する
     kwargs = {**params, **study.best_params}
     model = LGBMClassifier(**kwargs)
     model.fit(X_train[feature_col], y_train)
@@ -106,14 +106,8 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         logloss_list = [score for i, score in logloss_of_each_horse_N]
         current_score.extend(logloss_list)
         current_score.append(sum(logloss_list))
-        # accuracy
-        accuracyscore = accuracy_score(y_test, class_pred)
-        current_score.append(accuracyscore)
-        # f1-score
-        f1score = f1_score(y_test, class_pred)
-        current_score.append(f1score)
         # auc
-        auc_score = roc_auc_score(y_test, class_pred)
+        auc_score = roc_auc_score(y_test, pred)
         current_score.append(auc_score)
 
         # DataFrameに変換
@@ -126,8 +120,11 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         update_scores.to_csv("../Memo/logloss_score_of_each_horse_N.csv", index=False)
         display(update_scores)
 
+    # 返すデータの設定（予測値を埋め込む）
+    X_test["predict_proba"] = pred
+    X_test["class_pred"] = class_pred
 
-    return model
+    return model, X_test
 
 
 # objective関数を作る関数
@@ -168,7 +165,7 @@ def create_objective(X, y, splitter, feature_col, params):
 
             # modelの学習
             model.fit(X_train, y_train,
-                      eval_set=[(X_test, y_test)], # 評価データセットを指定
+                      eval_set=[(X_test, y_test)], # ここだいぶ怪しいけど大丈夫か？
                       eval_metric="binary_logloss",
                       callbacks=callbacks)
 
