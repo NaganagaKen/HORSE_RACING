@@ -121,8 +121,9 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         display(update_scores)
 
     # 返すデータの設定（予測値を埋め込む）
-    X_test["predict_proba"] = pred
-    X_test["class_pred"] = class_pred
+    X_test.loc[:, "pred"] = pred
+    X_test.loc[:, "class_pred"] = class_pred
+    X_test.loc[:, "target"] = y_test
 
     return model, X_test
 
