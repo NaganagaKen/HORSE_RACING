@@ -78,7 +78,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     feature_name = pd.Series(model.feature_name_)
     indices = np.argsort(importances)[::-1] 
 
-    plt.figure(figsize=(24,8))
+    plt.figure(figsize=(32,6))
     plt.title("Feature importances")
     plt.bar(range(len(indices)), importances[indices])
     plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
