@@ -53,6 +53,11 @@ def common_process(df_to_copy):
     # 内枠か外枠かを表す特徴量wakuを作成
     df["waku"] = df["waku_num"].apply(lambda x: "inner" if 1<=x<=4 else "outer")
 
+    # 脚質が分かりにくいので、変換する
+    # 参考: http://www.keiba-lab.jp/exp/up/d_1106.html
+    # 脚質は、逃げ・先行・差しa・差しb・追いa・追いb・後方とする
+    # 逃げ・先行も2分割できるが、ひとまずやめておく
+
 
     # 時系列順に並び替え
     place_dict = {
@@ -89,9 +94,15 @@ def common_process(df_to_copy):
     for col in to_category:
         df[col] = df[col].astype("object")
 
+
     # ターゲット変数の作成
-    df["target"] = df["rank"].apply(lambda x: 1 if x == 1 else 0)
-    df["target3"] = df["rank"].apply(lambda x: 1 if 1 <= x <= 3 else 0)
+    try:
+        # レース検索から得たデータ場合はこの列がある
+        df["target"] = df["rank"].apply(lambda x: 1 if x == 1 else 0)
+        df["target3"] = df["rank"].apply(lambda x: 1 if 1 <= x <= 3 else 0)
+    except:
+        # レース検索から得たデータではない場合（出馬表分析等）は何もしない（rank特徴量がない）
+        pass
 
     return df
 
