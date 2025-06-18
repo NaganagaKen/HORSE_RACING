@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import BaseCrossValidator
 
-
+# 特徴量エンジニアリングのための共通処理関数
 def common_process(df_to_copy):
     df = df_to_copy.copy()
 
@@ -105,6 +105,86 @@ def common_process(df_to_copy):
         pass
 
     return df
+
+
+
+# 競馬用の前処理関数
+# TargetFrontierJVのレース検索から得たデータを前処理する
+def preprocessing(df_to_copy):
+    df = df_to_copy.copy()
+    original_col = df.columns.tolist()
+    df["race_id"] = df["レースID(新)"]
+    df["year"] = df["日付"] // 10000
+    df["month"] = df["日付"] // 100 % 100
+    df["day"] = df["日付"] % 100
+    df["times"] = df["開催"].str[0].astype(int)
+    df["place"] = df["場所"]
+    df["daily"] = df["開催"].str[2]
+    df["race_num"] = df["Ｒ"]
+    df["horse"] = df["馬名S"]
+    df["jockey_id"] = df["騎手コード"]
+    df["trainer_id"] = df["調教師コード"]
+    df["horse_N"] = df["頭数"]
+    df["waku_num"] = df["枠番"]
+    df["horse_num"] = df["馬番"]
+    df["class_code"] = df["クラスコード"]
+    df["track_code"] = df["トラックコード(JV)"]
+    df["corner_num"] = df["ｺｰﾅｰ"]
+    df["dist"] = df["距離"].str[1:].astype(int)
+    df["state"] = df["馬場状態"]
+    df["weather"] = df["天気"]
+    df["age_code"] = df["競走種別"]
+    df["sex"] = df["性別"]
+    df["age"] = df["年齢"]
+    df["basis_weight"] = df["斤量"].str.replace(r'[^0-9.]', '', regex=True).astype(float)
+    df["blinker"] = df["ブリンカー"]
+    df["weight"] = df["馬体重"]
+    df["inc_dec"] = df["馬体重増減"]
+    df["weight_code"] = df["重量コード"]
+    df["win_odds"] = df["単勝オッズ"]
+    df["win_odds_1"] = df["指時系1・単勝"]
+    df["win_odds_1_pop"] = df["指時系1・人気"]
+    df["win_odds_2"] = df["指時系2・単勝"]
+    df["win_odds_2_pop"] = df["指時系2・人気"]
+    df["win_mul_odds_Hi"] = df["複勝オッズ上限"]
+    df["win_mul_odds_Lo"] = df["複勝オッズ下限"]
+    df["win_mul_odds_1_Hi"] = df["複上1"]
+    df["win_mul_odds_1_Lo"] = df["指時系1・複下"]
+    df["win_mul_odds_1_pop"] = df["複人気1"]
+    df["win_mul_odds_2_Hi"] = df["複上2"]
+    df["win_mul_odds_2_Lo"] = df["指時系2・複下"]
+    df["win_mul_odds_2_pop"] = df["複人気2"]
+    df["rank"] = df["確定着順"] 
+    df["time_diff"] = df["着差"]
+    df["time"] = df["走破タイム"]
+    df["corner1_rank"] = df["1角"]
+    df["corner2_rank"] = df["2角"]
+    df["corner3_rank"] = df["3角"]
+    df["corner4_rank"] = df["4角"]
+    df["last_3F_time"] = df["上り3F"]
+    df["last_3F_rank"] = df["上り3F順"]
+    df["Ave_3F"]= df["Ave-3F"]
+    original_col.remove("PCI")
+    original_col.remove("PCI3")
+    original_col.remove("RPCI")
+    df["last_3F_time_diff"] = df["上3F地点差"]
+    df["leg"] = df["脚質"]
+    df["pop"] = df["人気"]
+    df["prize"] = df["賞金"]
+    df["error_code"] = df["異常コード"]
+    df["father"] = df["種牡馬"]
+    df["mother"] = df["母馬"]
+    df["broodmare_sire"] = df["母父馬"]
+    df["broodmare_sire_type"] = df["母父タイプ名"]
+    df["horse_color"] = df["毛色"]
+    df["id"] = df["血統登録番号"]
+
+    df = df.drop(original_col, axis=1)
+
+    df.info()
+
+    return df
+
 
 
 # 競馬用の時系列かつグループ単位でバリデーションを行うsplitter
