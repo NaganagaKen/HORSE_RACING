@@ -1,8 +1,9 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 from IPython.display import display
 
 
+# 勝率予測用特徴量エンジニアリング関数
 def feature_engineering(df_to_copy, feature_col_to_copy=None):
     if feature_col_to_copy == None :
         feature_col_to_copy = ["waku_num", "horse_num", "sex", "age", "basis_weight", "blinker", "weight", "inc_dec"]
@@ -348,6 +349,11 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     feature_col.append("interval_day")
     feature_col.append("interval_week")
 
+    # 今回が一番位の高いレースか
+    df["class_code"] = df["class_code"].astype(int) # categoryなので、一度intに変換（cummaxが使えないため）
+    df["is_highest_class"] = df.groupby("horse", observed=True)["class_code"].cummax() == df["class_code"]
+    feature_col.append("is_highest_class")
+    df["class_code"] = df["class_code"].astype("category") # categoryに戻す
 
     # 最後に全体を正規化（std=1とする)
     num_col = df[feature_col].select_dtypes(include=["number"]).columns.tolist()

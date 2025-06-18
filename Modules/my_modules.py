@@ -83,9 +83,6 @@ def common_process(df_to_copy):
     df = df.sort_values("datetime")
     df = df.drop(["place_num"], axis=1)
 
-    # 必要ない特徴量は削除
-    df = df.drop(["race_id"], axis=1)
-
     # とりあえず平地レースだけを使用
     df = df[df["flat_or_jump"] == "平地"]
 
