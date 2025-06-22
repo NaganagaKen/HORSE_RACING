@@ -178,8 +178,6 @@ def preprocessing(df_to_copy):
 
     df = df.drop(original_col, axis=1)
 
-    df.info()
-
     return df
 
 
