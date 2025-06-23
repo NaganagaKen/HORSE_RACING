@@ -69,9 +69,6 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     model = LGBMClassifier(**kwargs)
     model.fit(X_train[feature_col], y_train)
     pred = model.predict_proba(X_test[feature_col])[:, 1]
-    class_pred = model.predict(X_test[feature_col])
-    print("Sum of predict      is :", sum(class_pred))
-    print("Sum of predict rate is :", round(sum(class_pred)/len(class_pred), 10))
 
     # モデルの重要度を表示
     importances = model.booster_.feature_importance(importance_type="gain")
@@ -90,7 +87,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     prob_calcurated_df = prob_calcurated_df.set_index(X_test.index) 
     for i in sorted(X.horse_N.unique().tolist()):
         horse_N_index = X_test.horse_N == i
-        prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, "first_prize_prob"]
+        prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, "pred"]
         logloss_score = log_loss(y_test[horse_N_index], prob_calcurate_horse_N)
         logloss_of_each_horse_N.append(tuple([i, logloss_score]))
 
@@ -121,9 +118,8 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         display(update_scores)
 
     # 返すデータの設定（予測値を埋め込む）
-    X_test.loc[:, "pred"] = pred
-    X_test.loc[:, "class_pred"] = class_pred
-    X_test.loc[:, "target"] = y_test
+    X_test = prob_calculator(X_test, pred)
+    X_test.loc[:, "target"] = y_test.values
 
     return model, X_test
 
@@ -180,7 +176,7 @@ def create_objective(X, y, splitter, feature_col, params):
         # y も対応するインデックスでフィルタリングする
         oof_df_for_prob_calc = X.loc[not_nan_indices].copy()
         oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc, oof_preds[not_nan_indices])
-        avg_logloss = log_loss(y[not_nan_indices], oof_preds_normalized_df["first_prize_prob"])
+        avg_logloss = log_loss(y[not_nan_indices], oof_preds_normalized_df["pred"])
 
         return avg_logloss
 
@@ -198,7 +194,8 @@ def prob_calculator(df_to_copy, prob):
     sum_prob = df.groupby(["id_for_fold"], observed=False)["unnormalized_prob"].sum()
     sum_prob = pd.DataFrame({"sum_prob": sum_prob})
     df = pd.merge(df, sum_prob, how="left", on="id_for_fold")
-    df["first_prize_prob"] = df["unnormalized_prob"] / df["sum_prob"]
+    df.index = df_to_copy.index # mergeでインデックスがリセットされたので、元に戻す
+    df["pred"] = df["unnormalized_prob"] / df["sum_prob"]
 
     df = df.drop(["unnormalized_prob", "sum_prob"], axis=1)
     return df
