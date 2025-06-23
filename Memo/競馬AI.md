@@ -81,12 +81,13 @@
 - レース前に分かる情報は何か調べる。
 - あとでデータサイエンス研究会のdriveにあるサンプルを見てみる。
 
+
 #### 一般メモ
   - ["waku_num", "horse_num", "sex", "age", "basis_weight", "blinker", "weight", "inc_dec"]がNo feature engineeringで使った特徴量
   - n_trialsは100-300くらいがちょうどいいかも500は明らかにやりすぎ
   - horse_Nを特徴量に追加したり、モデルをhorse_Nで分けるのは意味ない。データ数が少ないから汎化性能が低そう。
   - Netkeibaの指標は以下の通り
-    - タイム指数（計算方法は不明）https://race.netkeiba.com/race/speed.html?race_id=202505021209&rf=shutuba_submenu
+    - タイム指数（計算方法は不明、恐らく西田式？？？）https://race.netkeiba.com/race/speed.html?race_id=202505021209&rf=shutuba_submenu
     - 会場・芝orダート・距離ごとの分析https://race.netkeiba.com/race/data_top.html?race_id=202505021209&rf=race_submenu
       - コースで有利な枠順
       - 有利な脚質
@@ -94,11 +95,10 @@
       - 得意な調教師
       - 実績がある種牡馬
       - 実績がある母父
-
-
-#### 疑問点
 - error_codeの取り扱い
   - 1のデータは使用せずに学習させる。
+
+#### 疑問点
 
 
 ## これからやること
@@ -137,13 +137,13 @@
     - 脚質は元データのラベルを張り替えないといけなさそう
     - http://www.keiba-lab.jp/exp/up/d_1106.html
   - その他 (PCI, Ave-3Fなど)
-- oddsの予測
+- oddsの予測（労力の割には大した成果がなさそう）
   - https://logmi.jp/main/technology/330672
     - ターゲットを確定オッズではなく支持率にする
       - 確定オッズにすると、予測値が負になる可能性がある。
       - オッズ = 払戻率（控除率）/ 支持率
     - 特徴量エンジニアリング
-      - TrueSkillで馬や騎手のレートを計算
+      - TrueSkillで馬と騎手のレートを計算（済）
       - 血統ベクトルの計算(https://qiita.com/KTaskn/items/e76551191214593c278e)
       - 最後5回分のオッズの順位（単勝人気）
       - 順位の平均
@@ -156,14 +156,12 @@
 
 ### 特徴量エンジニアリング（案）
 - ageを2,3,over4としてカテゴリ化
-- blinkerの欠損値埋め（付けていない馬を"N"とかで埋める）
+- blinkerの欠損値埋め（付けていない馬を"N"とかで埋める）（そもそもblinkerの値が重要ではない可能性がある）
 - time_diffを使いたいなら、前処理しないといけない
   - 特に取り消しをどう処理するべきか調べる
 - 過去、同じ母父の馬がどのような成績だったのかを特徴量として加える。
 - 過去の平均順位（class_codeごとに作ったりする）
 - 今回のレースが、今までで一番位が高いレースか
-- 平均オッズ
-- 過去のオッズ
 - 単勝オッズの人気
 - targetの作り方に注意（rankが0は欠損値（異常終了））
 - TrueSkillで馬のレートを決める。
