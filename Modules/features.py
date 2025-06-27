@@ -39,7 +39,6 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
     # 過去その馬の全てのレースの1着率と複勝率
     #　シャープが3つついている列は、特徴量重要度の上位100位以内の列
-
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df,cols=["horse"]) ###
 
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist"]) 
@@ -62,18 +61,16 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "class_code"]) ###
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["place", "field_type", "dist"])
 
+    
     # 過去他の馬も含む全レースで同条件でのレースの1着の確率
     # dist, field_type, place, race_type, corner_num系
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["place", "waku"])
-
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["dist", "place", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "place", "waku"]) ###
-
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["race_type", "waku"]) ###
-    
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "waku"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "place", "waku"])
@@ -127,42 +124,6 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "class_code", "field_type"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "class_code", "race_type"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "class_code", "race_type", "waku"])
-
-    # trainer_id-turn_type系(効果なし)
-
-    # mother系
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "place"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "dist"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "field_type"]) ###
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "state"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "turn_type"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "race_type"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "track_code"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "class_code"]) ###
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "corner_num"])
-
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "place", "dist"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "state", "dist"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "place", "field_type"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["mother", "dist", "field_type"])
-
-    # father系
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "place"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "dist"]) ###
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "field_type"]) ###
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "state"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "turn_type"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "race_type"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "track_code"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "class_code"]) ###
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "corner_num"])
-
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "place", "dist"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "state", "dist"]) 
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "place", "field_type"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["father", "dist", "field_type"])
 
 
     # 最後にまとめてdict_for_dfをdfにくっつける
@@ -233,14 +194,82 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     # horse ×　jockey
     df["HorseTrueSkill_times_JockeyTrueSkill"] = df["horse_TrueSkill"] * df["jockey_TrueSkill"]
     feature_col.append("HorseTrueSkill_times_JockeyTrueSkill")
-    # horse + jockey
-    df["HorseTrueSkill_plus_JockeyTrueSkill"] = df["horse_TrueSkill"] + df["jockey_TrueSkill"]
-    feature_col.append("HorseTrueSkill_plus_JockeyTrueSkill")
-    
+
+        
+    # 過去に特定グループ内のレーティングの平均がいくつか計算する関数
+    # horse_TrueSkill
+    # father系
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "state"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "state", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "dist"], target_name="horse_TrueSkill") # 後でビン分割した距離も追加する予定
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "corner_num"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "dist"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "jockey_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "trainer_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "race_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "mother"], target_name="horse_TrueSkill")
+
+    # mother系
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "state"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "state", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "dist"], target_name="horse_TrueSkill") # 後でビン分割した距離も追加する予定
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "corner_num"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "dist"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "jockey_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "trainer_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "race_type"], target_name="horse_TrueSkill")
+
+    # broodmaresire系
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "state"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "state", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "dist"], target_name="horse_TrueSkill") # 後でビン分割した距離も追加する予定
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "corner_num"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "dist"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "jockey_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "trainer_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "race_type"], target_name="horse_TrueSkill")
+
+    # father x broodmaresire系
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "state"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "state", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "dist"], target_name="horse_TrueSkill") # 後でビン分割した距離も追加する予定
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "corner_num"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "dist"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "turn_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "field_type"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "jockey_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "trainer_id"], target_name="horse_TrueSkill")
+    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "race_type"], target_name="horse_TrueSkill")
+
+    # 後でjockey_id, trainer_idも追加予定(waku系はgrouped_winning_rateで対応)
+
+
     # 過去オッズの追加
     df, feature_col = merge_last_N_odds(df, feature_col)
 
-    # 全体を正規化（std=1とする)
+    # 数値列全体を正規化（std=1とする)
     num_col = df[feature_col].select_dtypes(include=["number"]).columns.tolist()
     grouped_mean = df.groupby("id_for_fold", observed=True)[num_col].transform("mean")
     grouped_std = df.groupby("id_for_fold", observed=True)[num_col].transform("std")
@@ -249,8 +278,7 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
     # ランキング特徴量
     group = df.groupby(["id_for_fold"], observed=True)
-    ranking_col = ["horse_TrueSkill", "jockey_TrueSkill", "HorseTrueSkill_times_JockeyTrueSkill",
-                   "HorseTrueSkill_plus_JockeyTrueSkill", "pre_win_odds_15", "pre_win_odds_20"]
+    ranking_col = ["horse_TrueSkill", "jockey_TrueSkill", "HorseTrueSkill_times_JockeyTrueSkill", "pre_win_odds_20"]
     
     for col in ranking_col:
         df[f"{col}_ranking"] = group[col].rank(ascending=False, method="min")
@@ -317,12 +345,38 @@ def grouped_winning_rate(df_to_copy, feature_col_to_copy, dict_for_df, cols):
     feature_col.append(feature_name3)
     dict_for_df[feature_name3] = bunsi3 / bunbo3.replace(0, np.nan)
 
-
     return dict_for_df, feature_col
 
 
+# 過去に特定グループ内のレーティングの平均がいくつか計算する関数
+# 収束が速いので、とりあえずTrueSkillのみで計算を行う
+def calc_grouped_rating(df_to_copy, feature_col_to_copy, cols=None, target_name=None):
+    # cols: List ... グループを決めるための特徴量のリスト
+    # target_name: str ... どのレーティングのスコアを平均するかを指定する文字列
+    if cols == None:
+        raise ValueError("cols must be selected")
+    elif target_name == None or type(target_name) != str:
+        raise ValueError("target_col must be str")
+
+    df = df_to_copy.copy()
+    feature_col = feature_col_to_copy.copy()
+    target_col = target_name + "_after_racing"
+    grouped1 = df.groupby(cols, observed=True)
+    grouped2 = df.groupby(["id_for_fold", *cols], observed=True)
+
+    # 同じ条件で1着になるの確率を計算
+    bunsi1 = grouped1[target_col].cumsum() - grouped2[target_col].cumsum()
+    bunbo1 = grouped1[target_col].cumcount() - grouped2[target_col].cumcount()
+
+    feature_name = f"mean_{target_name}_in_group_" + "_".join(cols)
+    feature_col.append(feature_name)
+    df[feature_name] = bunsi1 / bunbo1.replace(0, np.nan)
+
+    return df, feature_col
+    
+
 # 共通化されたTrueSkill計算関数
-def calc_trueskill_common(df, feature_col, target_col, prefix):
+def calc_trueskill_common(df_to_copy, feature_col, target_col, prefix):
     """
     df : DataFrame
     feature_col : list
@@ -332,15 +386,16 @@ def calc_trueskill_common(df, feature_col, target_col, prefix):
     prefix : str
         特徴量名の接頭辞（"horse" や "jockey"）
     """
-    df = df.copy()
+    df = df_to_copy.copy()
     feature_col = feature_col.copy()
 
-    CONFIDENCE_MULTIPLIER = 3
+    CONFIDENCE_MULTIPLIER = 3 # 何シグマ範囲でTrueSkillのmin, maxを計算するかを定める
 
     df[f"{prefix}_TrueSkill"] = np.nan
     df[f"{prefix}_TrueSkill_sigma"] = np.nan
     df[f"{prefix}_TrueSkill_min"] = np.nan
     df[f"{prefix}_TrueSkill_max"] = np.nan
+    df[f"{prefix}_TrueSkill_after_racing"] = np.nan # レース後のレーティング（特徴量には加えない、ターゲットエンコーディングに使用）
 
     feature_col.append(f"{prefix}_TrueSkill")
     feature_col.append(f"{prefix}_TrueSkill_sigma")
@@ -374,29 +429,22 @@ def calc_trueskill_common(df, feature_col, target_col, prefix):
         for target, new_group in zip(target_list, new_ratings):
             ratings[target] = new_group[0]
 
+        # レース後のレートを埋め込み
+        mu_array_after_racing = [float(ratings[target].mu) for target in all_target_list]
+        df.loc[mask, f"{prefix}_TrueSkill_after_racing"] = mu_array_after_racing
+
     return df.copy(), feature_col
 
 
 
 # オッズデータと結合する関数
 def merge_last_N_odds(df, feature_col):
-    N = 15 # どこからのオッズを取得するか指定する列
-
+    # 過学習抑制の為にオッズ情報をなるべく加えない（5分前オッズのみを加える）。
     odds_df = pd.read_csv("../Data/Time_Series_Odds_win_odds.csv", encoding="shift-jis")
-    odds_df_selected =  odds_df[["race_id"] + [f"pre_win_odds_{i}" for i in range(N, 21)]]
+    odds_df_selected =  odds_df[["race_id", "pre_win_odds_20"]]
 
-    dict_to_df = dict()
-    dict_to_df["pre_win_odds_mean"] = odds_df_selected[[f"pre_win_odds_{i}" for i in range(N, 21)]].mean(axis=1)
-    for i in range(N+1, 21):
-        dict_to_df[f"pre_win_odds_rate_{i}"] = odds_df_selected[f"pre_win_odds_{i}"] / odds_df_selected[f"pre_win_odds_{i-1}"].replace(0, np.nan)
-    
-    # 後はクラスタリングなどを追加するといいかも
+    new_feature_col = feature_col + ["pre_win_odds_20"]
 
-    odds_df_parsed = pd.DataFrame(dict_to_df)
-    odds_df_parsed = pd.concat([odds_df_parsed, odds_df_selected], axis=1)
-
-    new_feature_col = feature_col + [col for col in odds_df_parsed.columns.tolist() if col != "race_id"]
-
-    df = pd.merge(left=df, right=odds_df_parsed, how="left", on=["race_id"])
+    df = pd.merge(left=df, right=odds_df_selected, how="left", on=["race_id"])
 
     return df, new_feature_col
