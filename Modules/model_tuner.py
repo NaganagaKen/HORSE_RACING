@@ -115,7 +115,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         current_score_df = pd.DataFrame([current_data_dict])
         update_scores = pd.concat([current_score_df, old_scores], ignore_index=True)
         update_scores.to_csv("../Memo/logloss_score_of_each_horse_N.csv", index=False)
-        display(update_scores)
+        display(update_scores.head(5))
 
     # 返すデータの設定（予測値を埋め込む）
     X_test = prob_calculator(X_test, pred)

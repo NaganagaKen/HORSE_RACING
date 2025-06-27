@@ -101,7 +101,7 @@ def common_process(df_to_copy):
         # レース検索から得たデータではない場合（出馬表分析等）は何もしない（rank特徴量がない）
         pass
 
-    return df
+    return df.copy()
 
 
 
@@ -109,76 +109,77 @@ def common_process(df_to_copy):
 # TargetFrontierJVのレース検索から得たデータを前処理する
 def preprocessing(df_to_copy):
     df = df_to_copy.copy()
-    original_col = df.columns.tolist()
-    df["race_id"] = df["レースID(新)"]
-    df["year"] = df["日付"] // 10000
-    df["month"] = df["日付"] // 100 % 100
-    df["day"] = df["日付"] % 100
-    df["times"] = df["開催"].str[0].astype(int)
-    df["place"] = df["場所"]
-    df["daily"] = df["開催"].str[2]
-    df["race_num"] = df["Ｒ"]
-    df["horse"] = df["馬名S"]
-    df["jockey_id"] = df["騎手コード"]
-    df["trainer_id"] = df["調教師コード"]
-    df["horse_N"] = df["頭数"]
-    df["waku_num"] = df["枠番"]
-    df["horse_num"] = df["馬番"]
-    df["class_code"] = df["クラスコード"]
-    df["track_code"] = df["トラックコード(JV)"]
-    df["corner_num"] = df["ｺｰﾅｰ"]
-    df["dist"] = df["距離"].str[1:].astype(int)
-    df["state"] = df["馬場状態"]
-    df["weather"] = df["天気"]
-    df["age_code"] = df["競走種別"]
-    df["sex"] = df["性別"]
-    df["age"] = df["年齢"]
-    df["basis_weight"] = df["斤量"].str.replace(r'[^0-9.]', '', regex=True).astype(float)
-    df["blinker"] = df["ブリンカー"]
-    df["weight"] = df["馬体重"]
-    df["inc_dec"] = df["馬体重増減"]
-    df["weight_code"] = df["重量コード"]
-    df["win_odds"] = df["単勝オッズ"]
-    df["win_odds_1"] = df["指時系1・単勝"]
-    df["win_odds_1_pop"] = df["指時系1・人気"]
-    df["win_odds_2"] = df["指時系2・単勝"]
-    df["win_odds_2_pop"] = df["指時系2・人気"]
-    df["win_mul_odds_Hi"] = df["複勝オッズ上限"]
-    df["win_mul_odds_Lo"] = df["複勝オッズ下限"]
-    df["win_mul_odds_1_Hi"] = df["複上1"]
-    df["win_mul_odds_1_Lo"] = df["指時系1・複下"]
-    df["win_mul_odds_1_pop"] = df["複人気1"]
-    df["win_mul_odds_2_Hi"] = df["複上2"]
-    df["win_mul_odds_2_Lo"] = df["指時系2・複下"]
-    df["win_mul_odds_2_pop"] = df["複人気2"]
-    df["rank"] = df["確定着順"] 
-    df["time_diff"] = df["着差"]
-    df["time"] = df["走破タイム"]
-    df["corner1_rank"] = df["1角"]
-    df["corner2_rank"] = df["2角"]
-    df["corner3_rank"] = df["3角"]
-    df["corner4_rank"] = df["4角"]
-    df["last_3F_time"] = df["上り3F"]
-    df["last_3F_rank"] = df["上り3F順"]
-    df["Ave_3F"]= df["Ave-3F"]
-    original_col.remove("PCI")
-    original_col.remove("PCI3")
-    original_col.remove("RPCI")
-    df["last_3F_time_diff"] = df["上3F地点差"]
-    df["leg"] = df["脚質"]
-    df["pop"] = df["人気"]
-    df["prize"] = df["賞金"]
-    df["error_code"] = df["異常コード"]
-    df["father"] = df["種牡馬"]
-    df["mother"] = df["母馬"]
-    df["broodmare_sire"] = df["母父馬"]
-    df["broodmare_sire_type"] = df["母父タイプ名"]
-    df["horse_color"] = df["毛色"]
-    df["id"] = df["血統登録番号"]
+    dict_to_df = dict()
 
-    df = df.drop(original_col, axis=1)
+    dict_to_df["race_id"] = df["レースID(新)"]
+    dict_to_df["year"] = df["日付"] // 10000
+    dict_to_df["month"] = df["日付"] // 100 % 100
+    dict_to_df["day"] = df["日付"] % 100
+    dict_to_df["times"] = df["開催"].str[0].astype(int)
+    dict_to_df["place"] = df["場所"]
+    dict_to_df["daily"] = df["開催"].str[2]
+    dict_to_df["race_num"] = df["Ｒ"]
+    dict_to_df["horse"] = df["馬名S"]
+    dict_to_df["jockey_id"] = df["騎手コード"]
+    dict_to_df["trainer_id"] = df["調教師コード"]
+    dict_to_df["horse_N"] = df["頭数"]
+    dict_to_df["waku_num"] = df["枠番"]
+    dict_to_df["horse_num"] = df["馬番"]
+    dict_to_df["class_code"] = df["クラスコード"]
+    dict_to_df["track_code"] = df["トラックコード(JV)"]
+    dict_to_df["corner_num"] = df["ｺｰﾅｰ"]
+    dict_to_df["dist"] = df["距離"].str[1:].astype(int)
+    dict_to_df["state"] = df["馬場状態"]
+    dict_to_df["weather"] = df["天気"]
+    dict_to_df["age_code"] = df["競走種別"]
+    dict_to_df["sex"] = df["性別"]
+    dict_to_df["age"] = df["年齢"]
+    dict_to_df["basis_weight"] = df["斤量"].str.replace(r'[^0-9.]', '', regex=True).astype(float)
+    dict_to_df["blinker"] = df["ブリンカー"]
+    dict_to_df["weight"] = df["馬体重"]
+    dict_to_df["inc_dec"] = df["馬体重増減"]
+    dict_to_df["weight_code"] = df["重量コード"]
+    dict_to_df["win_odds"] = df["単勝オッズ"]
+    dict_to_df["win_odds_1"] = df["指時系1・単勝"]
+    dict_to_df["win_odds_1_pop"] = df["指時系1・人気"]
+    dict_to_df["win_odds_2"] = df["指時系2・単勝"]
+    dict_to_df["win_odds_2_pop"] = df["指時系2・人気"]
+    dict_to_df["win_mul_odds_Hi"] = df["複勝オッズ上限"]
+    dict_to_df["win_mul_odds_Lo"] = df["複勝オッズ下限"]
+    dict_to_df["win_mul_odds_1_Hi"] = df["複上1"]
+    dict_to_df["win_mul_odds_1_Lo"] = df["指時系1・複下"]
+    dict_to_df["win_mul_odds_1_pop"] = df["複人気1"]
+    dict_to_df["win_mul_odds_2_Hi"] = df["複上2"]
+    dict_to_df["win_mul_odds_2_Lo"] = df["指時系2・複下"]
+    dict_to_df["win_mul_odds_2_pop"] = df["複人気2"]
+    dict_to_df["rank"] = df["確定着順"]
+    dict_to_df["time_diff"] = df["着差"]
+    dict_to_df["time"] = df["走破タイム"]
+    dict_to_df["corner1_rank"] = df["1角"]
+    dict_to_df["corner2_rank"] = df["2角"]
+    dict_to_df["corner3_rank"] = df["3角"]
+    dict_to_df["corner4_rank"] = df["4角"]
+    dict_to_df["last_3F_time"] = df["上り3F"]
+    dict_to_df["last_3F_rank"] = df["上り3F順"]
+    dict_to_df["Ave_3F"]= df["Ave-3F"]
+    dict_to_df["PCI"] = df["PCI"] #PCI3, RPCI
+    dict_to_df["PCI3"] = df["PCI3"]
+    dict_to_df["RPCI"] = df["RPCI"]
+    dict_to_df["last_3F_time_diff"] = df["上3F地点差"]
+    dict_to_df["leg"] = df["脚質"]
+    dict_to_df["pop"] = df["人気"]
+    dict_to_df["prize"] = df["賞金"]
+    dict_to_df["error_code"] = df["異常コード"]
+    dict_to_df["father"] = df["種牡馬"]
+    dict_to_df["mother"] = df["母馬"]
+    dict_to_df["broodmare_sire"] = df["母父馬"]
+    dict_to_df["broodmare_sire_type"] = df["母父タイプ名"]
+    dict_to_df["horse_color"] = df["毛色"]
+    dict_to_df["id"] = df["血統登録番号"]
 
-    return df
+    ret_df = pd.DataFrame(dict_to_df)
+
+    return ret_df
 
 
 

@@ -55,18 +55,12 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["age_code"]) ###
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weight_code"]) ###
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id"]) ###
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "class_code"])
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "place"])
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "dist"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "field_type"]) ###
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "place", "dist"])
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "place", "field_type", "dist"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "state"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "corner_num"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "track_code"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "class_code"]) ###
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["place", "field_type", "dist"])
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["place", "field_type", "dist", "class_code"])
 
     # 過去他の馬も含む全レースで同条件でのレースの1着の確率
     # dist, field_type, place, race_type, corner_num系
@@ -231,30 +225,37 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     # TrueSkillの計算
     # horse
     print("calculating trueskill of horse is processing")
-    df = calc_trueskill_horse(df) ###
-    feature_col.append("horse_TrueSkill")
+    df, feature_col = calc_trueskill_common(df, feature_col, "horse", "horse") ###
     # jockey
     print("calculating trueskill of jockey is processing")
-    df = calc_trueskill_jockey(df) ###
-    feature_col.append("jockey_TrueSkill")
+    df, feature_col = calc_trueskill_common(df, feature_col, "jockey_id", "jockey") ###
+
     # horse ×　jockey
     df["HorseTrueSkill_times_JockeyTrueSkill"] = df["horse_TrueSkill"] * df["jockey_TrueSkill"]
     feature_col.append("HorseTrueSkill_times_JockeyTrueSkill")
     # horse + jockey
     df["HorseTrueSkill_plus_JockeyTrueSkill"] = df["horse_TrueSkill"] + df["jockey_TrueSkill"]
     feature_col.append("HorseTrueSkill_plus_JockeyTrueSkill")
-
     
     # 過去オッズの追加
     df, feature_col = merge_last_N_odds(df, feature_col)
 
-    # 最後に全体を正規化（std=1とする)
+    # 全体を正規化（std=1とする)
     num_col = df[feature_col].select_dtypes(include=["number"]).columns.tolist()
     grouped_mean = df.groupby("id_for_fold", observed=True)[num_col].transform("mean")
     grouped_std = df.groupby("id_for_fold", observed=True)[num_col].transform("std")
     df[num_col] = (df[num_col] - grouped_mean) / grouped_std
 
-    # 後でランキング化とかも付ける予定
+
+    # ランキング特徴量
+    group = df.groupby(["id_for_fold"], observed=True)
+    ranking_col = ["horse_TrueSkill", "jockey_TrueSkill", "HorseTrueSkill_times_JockeyTrueSkill",
+                   "HorseTrueSkill_plus_JockeyTrueSkill", "pre_win_odds_15", "pre_win_odds_20"]
+    
+    for col in ranking_col:
+        df[f"{col}_ranking"] = group[col].rank(ascending=False, method="min")
+        feature_col.append(f"{col}_ranking")
+
 
     # dfを表示
     print(feature_col)
@@ -320,71 +321,61 @@ def grouped_winning_rate(df_to_copy, feature_col_to_copy, dict_for_df, cols):
     return dict_for_df, feature_col
 
 
-# 各馬のTrueSkillを計算する関数
-def calc_trueskill_horse(df):
+# 共通化されたTrueSkill計算関数
+def calc_trueskill_common(df, feature_col, target_col, prefix):
+    """
+    df : DataFrame
+    feature_col : list
+        特徴量リスト
+    target_col : str
+        対象となる列名（"horse" や "jockey_id"）
+    prefix : str
+        特徴量名の接頭辞（"horse" や "jockey"）
+    """
     df = df.copy()
-    df["horse_TrueSkill"] = np.nan
+    feature_col = feature_col.copy()
 
-    env = TrueSkill(draw_probability=0.0) # TrueSkill環境
-    ratings = defaultdict(lambda:env.create_rating()) # 全馬のレートが入っている辞書
+    CONFIDENCE_MULTIPLIER = 3
+
+    df[f"{prefix}_TrueSkill"] = np.nan
+    df[f"{prefix}_TrueSkill_sigma"] = np.nan
+    df[f"{prefix}_TrueSkill_min"] = np.nan
+    df[f"{prefix}_TrueSkill_max"] = np.nan
+
+    feature_col.append(f"{prefix}_TrueSkill")
+    feature_col.append(f"{prefix}_TrueSkill_sigma")
+    feature_col.append(f"{prefix}_TrueSkill_min")
+    feature_col.append(f"{prefix}_TrueSkill_max")
+
+    env = TrueSkill(draw_probability=0.0)
+    ratings = defaultdict(lambda: env.create_rating())
 
     grouped = df.groupby("id_for_fold", observed=True)
 
     for id, group in grouped:
         race_data = group[group["error_code"] == 0].copy()
 
-        horse_list = race_data["horse"].tolist()
-        race_ratings = [[ratings[horse]] for horse in horse_list]
+        target_list = race_data[target_col].tolist()
+        race_ratings = [[ratings[target]] for target in target_list]
 
-        # 各馬のレーティングを埋め込み
-        # error_codeが0ではない馬（異常終了）は一つ前のレースのデータを埋め込む
-        all_horse_list = group["horse"].tolist()
-        mu_array = [ratings[horse].mu for horse in all_horse_list]
-        mask = (df["id_for_fold"] == id) & (df["horse"].isin(all_horse_list))
-        df.loc[mask, "horse_TrueSkill"] = mu_array
+        all_target_list = group[target_col].tolist()
+        mu_array = [float(ratings[target].mu) for target in all_target_list]
+        sigma_array = [float(ratings[target].sigma) for target in all_target_list]
+        mask = (df["id_for_fold"] == id) & (df[target_col].isin(all_target_list))
 
-        # レーティングの更新
-        ranks = race_data["rank"].tolist() # レースの結果
+        df.loc[mask, f"{prefix}_TrueSkill"] = mu_array
+        df.loc[mask, f"{prefix}_TrueSkill_sigma"] = sigma_array
+        df.loc[mask, f"{prefix}_TrueSkill_min"] = np.array(mu_array) - np.array(sigma_array) * CONFIDENCE_MULTIPLIER
+        df.loc[mask, f"{prefix}_TrueSkill_max"] = np.array(mu_array) + np.array(sigma_array) * CONFIDENCE_MULTIPLIER
+
+        ranks = race_data["rank"].tolist()
         new_ratings = env.rate(race_ratings, ranks=ranks)
 
-        for horse, new_group in zip(horse_list, new_ratings):
-            ratings[horse] = new_group[0]
+        for target, new_group in zip(target_list, new_ratings):
+            ratings[target] = new_group[0]
 
-    return df
+    return df.copy(), feature_col
 
-
-# 各ジョッキーのTrueSkillを計算する関数
-def calc_trueskill_jockey(df):
-    df = df.copy()
-    df["jockey_TrueSkill"] = np.nan
-
-    env = TrueSkill(draw_probability=0.0) # TrueSkill環境
-    ratings = defaultdict(lambda:env.create_rating()) # 全馬のレートが入っている辞書
-
-    grouped = df.groupby("id_for_fold", observed=True)
-
-    for id, group in grouped:    
-        race_data = group[group["error_code"] == 0].copy()
-
-        jockey_list = race_data["jockey_id"].tolist()
-        race_ratings = [[ratings[jockey]] for jockey in jockey_list]
-
-        # 各馬のレーティングを埋め込み
-        # error_codeが0ではない馬（異常終了）は一つ前のレースのデータを埋め込む
-        all_jockey_list = group["jockey_id"].tolist()
-        mu_array = [ratings[jockey].mu for jockey in all_jockey_list]
-        mask = (df["id_for_fold"] == id) & (df["jockey_id"].isin(all_jockey_list))
-        df.loc[mask, "jockey_TrueSkill"] = mu_array
-
-        # レーティングの更新
-        ranks = race_data["rank"].tolist() # レースの結果
-        new_ratings = env.rate(race_ratings, ranks=ranks)
-
-        for jockey, new_group in zip(jockey_list, new_ratings):
-            ratings[jockey] = new_group[0]
-
-
-    return df
 
 
 # オッズデータと結合する関数
