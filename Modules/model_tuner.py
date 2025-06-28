@@ -174,9 +174,9 @@ def create_objective(X, y, splitter, feature_col, params):
 
         # NaN ではない部分のみで log_loss を計算
         # y も対応するインデックスでフィルタリングする
-        oof_df_for_prob_calc = X.loc[not_nan_indices].copy()
-        oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc, oof_preds[not_nan_indices])
-        avg_logloss = log_loss(y[not_nan_indices], oof_preds_normalized_df["pred"])
+        #oof_df_for_prob_calc = X.loc[not_nan_indices].copy()
+        #oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc, oof_preds[not_nan_indices])
+        avg_logloss = log_loss(y[not_nan_indices], oof_preds[not_nan_indices])
 
         return avg_logloss
 

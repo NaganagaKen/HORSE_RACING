@@ -53,11 +53,9 @@ def common_process(df_to_copy):
     # 内枠か外枠かを表す特徴量wakuを作成
     df["waku"] = df["waku_num"].apply(lambda x: "inner" if 1<=x<=4 else "outer")
 
-    # 脚質が分かりにくいので、変換する
     # 参考: http://www.keiba-lab.jp/exp/up/d_1106.html
     # 脚質は、逃げ・先行・差しa・差しb・追いa・追いb・後方とする
-    # 逃げ・先行も2分割できるが、ひとまずやめておく
-
+    # 逃げ・先行も2分割できるらしいが、ひとまずやめておく
 
     # 時系列順に並び替え
     place_dict = {
@@ -86,8 +84,17 @@ def common_process(df_to_copy):
     # とりあえず平地レースだけを使用
     df = df[df["flat_or_jump"] == "平地"]
 
+    # 年齢を2, 3, over4に分割してカテゴリ化する
+    age_dict = {
+        2: "2",
+        3: "3",
+        4: "over4"
+    }
+    df["age_type"] = df["age"].apply(lambda x: x if x < 4 else 4)
+    df["age_type"] = df["age_type"].replace(age_dict)
+
     # カテゴリを示す数値列をカテゴリ列に変換
-    to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code"]
+    to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code", "age_type"]
     for col in to_category:
         df[col] = df[col].astype("object")
 
