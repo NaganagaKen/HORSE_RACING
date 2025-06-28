@@ -162,7 +162,7 @@ def create_objective(X, y, splitter, feature_col, params):
 
             # modelの学習
             model.fit(X_train, y_train,
-                      eval_set=[(X_test, y_test)], # ここだいぶ怪しいけど大丈夫か？
+                      eval_set=[(X_test, y_test)],
                       eval_metric="binary_logloss",
                       callbacks=callbacks)
 
