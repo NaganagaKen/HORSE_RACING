@@ -5,6 +5,7 @@ from trueskill import TrueSkill
 from itertools import combinations
 from collections import defaultdict
 from glicko2 import Player
+from sklearn.preprocessing import PolynomialFeatures
 
 
 # 勝率予測用特徴量エンジニアリング関数
@@ -14,6 +15,8 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
         feature_col_to_copy = ["waku_num", "horse_num", "sex", "age", "basis_weight", "weight", "inc_dec"]
     feature_col = feature_col_to_copy.copy()
     df = df_to_copy.copy()
+
+    ranking_col = [] # ランキング化する特徴量の名前を入れるリスト（特に重要な特徴量はランキング化する）
 
     # 直近3レースの結果とその平均, 過去全てのレースの記録の平均を追加（PCIとRPCIはあまり重要ではなさそう）
     last_race_col = ["weight", "inc_dec", "last_3F_time", "Ave_3F"]
@@ -34,6 +37,13 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
         count = grouped.cumcount()
         df[f"{col}_mean_all"] = (cumsum - df[col]) / count.replace(0, np.nan)
         feature_col.append(f"{col}_mean_all")
+
+    # 単変量特徴量を追加
+    df["num_of_entries"] = df.groupby("horse", observed=True)["horse"].cumcount()
+    feature_col.append("num_of_entries")
+
+    # 過去選択された脚質の回数と確率を追加
+    df, feature_col = calc_leg_cumsum(df, feature_col)
 
     # 相互作用特徴量を追加
     # weightに関する特徴量
@@ -86,16 +96,9 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
 
     # TrueSkillの計算
-    # horse
-    print("calculating trueskill of horse is in progress")
+    print("calculating trueskill is in progress")
     df, feature_col = calc_trueskill_fast(df, feature_col, "horse", "horse") ###
-    # jockey
-    print("calculating trueskill of jockey is in progress")
     df, feature_col = calc_trueskill_fast(df, feature_col, "jockey_id", "jockey") ###
-
-    # horse ×　jockey
-    df["HorseTrueSkill_times_JockeyTrueSkill"] = df["horse_TrueSkill"] * df["jockey_TrueSkill"]
-    feature_col.append("HorseTrueSkill_times_JockeyTrueSkill")
 
     # EloRatingの計算
     print("calculating EloRating is in progress")
@@ -103,10 +106,35 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     df, feature_col = calc_elo_rating_fast(df, feature_col, target_col="jockey_id", prefix="jockey")
 
     # Glicko2の計算
-    print("calculating Glicko is in progress")
+    print("calculating Glicko2 is in progress")
     df, feature_col = calc_glicko2_common(df, feature_col, target_col="horse", prefix="horse")
     #jockeyの部分は、なぜかエラーが出るので、gitからソースコードを引っ張ってきて、それを直接直そうと思う。
     #df, feature_col = calc_glicko2_common(df, feature_col, target_col="jockey_id", prefix="jockey") 
+
+    # 各レートの上昇量を計算
+    rating_diff_list = ['horse_TrueSkill', 'jockey_TrueSkill', 'horse_EloRating', 'jockey_EloRating', 'horse_Glicko2'] # 空白区切り
+    for col in rating_diff_list:
+        df, feature_col = calc_rating_diff(df, feature_col, target_col=col, prefix=col)
+
+
+    # レーティングの相互作用特徴量を追加
+    poly = PolynomialFeatures(degree=2, include_bias=False, interaction_only=True)
+    poly_list = ['horse_TrueSkill', 'horse_TrueSkill_min',
+                         'horse_TrueSkill_max', 'jockey_TrueSkill',
+                         'jockey_TrueSkill_min', 'jockey_TrueSkill_max', 'horse_EloRating', 
+                         'jockey_EloRating', 'horse_Glicko2',
+                         'horse_Glicko2_min', 'horse_Glicko2_max']
+    poly_features = poly.fit_transform(df[poly_list])
+    poly_features_name = poly.get_feature_names_out(poly_list)
+    poly_features_df = pd.DataFrame(poly_features, columns=poly_features_name, index=df.index)
+
+    # 15 個の元列だけ除外してから結合（PolynomialFeaturesは相互作用を計算しないものまで含めてしまう）
+    interaction_cols = [c for c in poly_features_name if c not in poly_list]
+    feature_col.extend(interaction_cols)
+    ranking_col.extend(["jockey_TrueSkill horse_Glicko2", "jockey_TrueSkill_min horse_Glicko2", "jockey_TrueSkill_max horse_Glicko2"])
+    df = pd.concat([df, poly_features_df[interaction_cols]], axis=1)
+
+    print("poly calculated")
 
 
     # 過去に特定グループ内のレーティングの平均がいくつか計算する関数
@@ -185,6 +213,7 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
     # --- 後でもう少し追加予定 --- 
 
+    print("calc grouped rating caluculated")
 
     # 過去その馬の全てのレースの1着率と複勝率
     # 特徴量を入れておくための辞書(fragment防止)
@@ -255,11 +284,22 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     processed_df = pd.DataFrame(dict_for_df)
     df = pd.concat([df, processed_df], axis=1)
 
+    print("group_winning_rate_calculated")
 
-    # 過去オッズの追加
+    # 過去オッズの追加(gainが高すぎるので一度加えないでおく)
     df, feature_col = merge_last_N_odds(df, feature_col)
+    ranking_col.append("pre_win_odds_20")
+    print("added last odds")
+
+    ## ここから開始
+    show_df_duplicate_columns(df)
 
     # 数値列全体を正規化（std=1とする)
+
+    if df.columns.duplicated().any():
+        print("★ df に重複列があります → 先頭を残して削除します")
+        df = df.loc[:, ~df.columns.duplicated()]
+
     num_col = df[feature_col].select_dtypes(include=["number"]).columns.tolist()
     grouped_mean = df.groupby("id_for_fold", observed=True)[num_col].transform("mean")
     grouped_std = df.groupby("id_for_fold", observed=True)[num_col].transform("std")
@@ -268,11 +308,12 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
     # ランキング特徴量
     group = df.groupby(["id_for_fold"], observed=True)
-    ranking_col = ["horse_TrueSkill", "jockey_TrueSkill", "HorseTrueSkill_times_JockeyTrueSkill", "pre_win_odds_20"]
     
     for col in ranking_col:
         df[f"{col}_ranking"] = group[col].rank(ascending=False, method="min")
         feature_col.append(f"{col}_ranking")
+
+    print("calculated rankings")
 
     # dfを表示
     print(feature_col)
@@ -282,6 +323,38 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
 
 # ------------------------------------ メイン関数ここまで -------------------------------------------------
+def show_df_duplicate_columns(df):
+    dup_cols = df.columns[df.columns.duplicated()].unique()
+    if len(dup_cols):
+        print("▼ DataFrame 内で重複している列:", list(dup_cols))
+
+
+# 過去に選択された脚質を追加（回数+確率）
+def calc_leg_cumsum(df_to_copy, feature_col_to_copy):
+    df = df_to_copy.copy()
+    feature_col = feature_col_to_copy.copy()
+    target_col = ['後方', '中団', '逃げ', '先行', 'ﾏｸﾘ'] # なぜか追込がいない... 
+
+    df["num_of_entries"] = df.groupby("horse", observed=True)["horse"].cumcount()
+
+    leg_dummy = pd.get_dummies(df["leg"], drop_first=False).astype(int)
+    df = pd.concat([df, leg_dummy], axis=1)
+
+    grouped1 = df.groupby("horse", observed=True)
+    grouped2 = df.groupby(["id_for_fold", "horse"], observed=True)
+
+    # 同じ条件で1着になるの確率を計算
+    bunsi1 = grouped1[target_col].cumsum() - grouped2[target_col].cumsum()
+
+    for col in target_col:
+        feature_name1 = f"{col}_per_entries"
+        feature_name2 = f"{col}_cumcount_past_racing"
+        df[feature_name1] = bunsi1[col] / df["num_of_entries"].replace(0, np.nan) # 脚質の選択確率を追加
+        feature_col.append(feature_name1)
+        df[feature_name2] = bunsi1[col] # 脚質の選択回数を追加
+        feature_col.append(feature_name2)
+
+    return df, feature_col
 
 
 # 馬でグループ化したtarget-encodingをする関数
@@ -582,15 +655,11 @@ def calc_glicko2_common(
     df_to_copy, feature_col, target_col, prefix,
     *, conf_mult=3.0, rd_cap=350.0, rd_floor=30.0,
     init_mu=1500.0, init_rd=250.0, init_vol=0.06,
-    rating_period_days=30          # 何日で 1 rating-period とみなすか
+    rating_period_days=30
 ):
-    """
-    - 各馬の Glicko-2 を時系列で更新
-    - 前走から rating_period_days 日空くごとに RD を拡散
-    """
     df = df_to_copy.copy()
     feature_col = feature_col.copy()
-    df = df.sort_values("datetime").reset_index(drop=True)   # 時系列保証
+    df = df.sort_values("datetime").reset_index(drop=True)
 
     main  = f"{prefix}_Glicko2"
     rd    = f"{prefix}_Glicko2_RD"
@@ -600,68 +669,80 @@ def calc_glicko2_common(
     df[[main, rd, gmin, gmax, after]] = np.nan
     feature_col.extend([main, rd, gmin, gmax])
 
-    # 馬 → Player オブジェクト
     players = defaultdict(lambda: Player(rating=init_mu, rd=init_rd, vol=init_vol))
-    # 馬 → 最終出走日
     last_played = dict()
 
     for race_id, group in df.groupby("id_for_fold", observed=True):
-        race_date = group["datetime"].iloc[0]     # 同一レースなので先頭で良い
-        race = group[group["error_code"] == 0]
+        race_date = group["datetime"].iloc[0]
+        horses_all = group[target_col].tolist()
 
-        horses, ranks = race[target_col].tolist(), race["rank"].tolist()
-        if len(horses) < 2:
-            continue
-
-        # ── 出走馬についてのみ「経過日数ぶん RD 拡散」 ──
-        for h in horses:
+        # 経過日数による RD 拡散
+        for h in horses_all:
             if h in last_played:
                 diff_days = (race_date - last_played[h]).days
                 n_periods = diff_days // rating_period_days
                 for _ in range(int(n_periods)):
                     players[h].did_not_compete()
 
-        # 直前のレーティングを取得
-        mu_pre = np.array([players[h].getRating() for h in horses])
-        rd_pre = np.array(
-            [np.clip(players[h].getRd(), rd_floor, rd_cap) for h in horses]
-        )
-        idx = race.index
+        # レース前レーティングの埋め込み（全馬対象）
+        mu_pre = np.array([players[h].getRating() for h in horses_all])
+        rd_pre = np.array([np.clip(players[h].getRd(), rd_floor, rd_cap) for h in horses_all])
+        idx = group.index
         df.loc[idx, main] = mu_pre
         df.loc[idx, rd]   = rd_pre
         df.loc[idx, gmin] = mu_pre - conf_mult * rd_pre
         df.loc[idx, gmax] = mu_pre + conf_mult * rd_pre
 
-        # ── 勝敗を作成 ──
-        update_args = {h: ([], [], []) for h in horses}
-        for (h_i, r_i), (h_j, r_j) in combinations(zip(horses, ranks), 2):
+        # 正常な馬のみでレート更新
+        race = group[group["error_code"] == 0]
+        horses_valid, ranks = race[target_col].tolist(), race["rank"].tolist()
+        if len(horses_valid) < 2:
+            # 出走日だけ記録して終わり
+            for h in horses_valid:
+                last_played[h] = race_date
+            continue
+
+        # 勝敗作成
+        update_args = {h: ([], [], []) for h in horses_valid}
+        for (h_i, r_i), (h_j, r_j) in combinations(zip(horses_valid, ranks), 2):
             s_i, s_j = (1.0, 0.0) if r_i < r_j else (0.0, 1.0) if r_i > r_j else (0.5, 0.5)
-            # i 対 j
             update_args[h_i][0].append(players[h_j].getRating())
             update_args[h_i][1].append(np.clip(players[h_j].getRd(), rd_floor, rd_cap))
             update_args[h_i][2].append(s_i)
-            # j 対 i
             update_args[h_j][0].append(players[h_i].getRating())
             update_args[h_j][1].append(np.clip(players[h_i].getRd(), rd_floor, rd_cap))
             update_args[h_j][2].append(s_j)
 
-        # ── 一括更新 ──
+        # 一括更新
         for h, (opp_r, opp_rd, score) in update_args.items():
             try:
                 players[h].update_player(opp_r, opp_rd, score)
             except ZeroDivisionError:
-                # 極端に RD が小さいとたまに 0 除算が出るので握りつぶす
                 pass
-
-            # 出走日を記録（必ず最後に）
             last_played[h] = race_date
 
-        # 更新後レーティングを保存
-        mu_after = np.array([players[h].getRating() for h in horses])
+        # レース後レーティングの埋め込み（全馬対象）
+        mu_after = np.array([players[h].getRating() for h in horses_all])
         df.loc[idx, after] = mu_after
 
     return df, feature_col
 
+
+# レーティングの上昇量を計算
+def calc_rating_diff(df, feature_col, target_col=None, prefix=None):
+    if (target_col is None) or (prefix is None):
+        raise ValueError("target_col and prefix must be selected")
+    
+    df = df.copy()
+    feature_col = feature_col.copy()
+
+    last_trueskill = df.groupby("horse", observed=True)[target_col]
+    for i in [1, 3]:
+        feature_name = f"{prefix}_diff_from_last{i}_racing"
+        df[feature_name] = df[target_col] - last_trueskill.shift(i)
+        feature_col.append(feature_name)
+
+    return df, feature_col
 
 
 # オッズデータと結合する関数
