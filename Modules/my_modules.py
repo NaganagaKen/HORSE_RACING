@@ -93,6 +93,9 @@ def common_process(df_to_copy):
     df["age_type"] = df["age"].apply(lambda x: x if x < 4 else 4)
     df["age_type"] = df["age_type"].replace(age_dict)
 
+    # 学習に使う重みを追加
+    df["sample_weight"] = 1 / df["horse_N"]
+
     # カテゴリを示す数値列をカテゴリ列に変換
     to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code", "age_type"]
     for col in to_category:

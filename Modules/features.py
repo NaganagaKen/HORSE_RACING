@@ -101,7 +101,6 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     print("calculating EloRating is in progress")
     df, feature_col = calc_elo_rating_fast(df, feature_col, target_col="horse", prefix="horse")
     df, feature_col = calc_elo_rating_fast(df, feature_col, target_col="jockey_id", prefix="jockey")
-    print("END EloRating", feature_col)
 
     # Glicko2の計算
     print("calculating Glicko is in progress")

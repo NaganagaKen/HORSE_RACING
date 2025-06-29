@@ -4,7 +4,9 @@ from my_modules import GroupTimeSeriesSplit
 import matplotlib.pyplot as plt
 from IPython.display import display
 import optuna
-from sklearn.metrics import log_loss, roc_auc_score, accuracy_score, f1_score
+from sklearn.metrics import log_loss, roc_auc_score
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
 import lightgbm as lgb
 from lightgbm import LGBMClassifier
 import time
@@ -24,7 +26,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     params = {
         "objective" : "binary",
         "metric" : "binary_logloss",
-        "n_estimators": 1000,
+        "n_estimators": 5000,
         "n_jobs" : -1,
         "verbose" : -1,
         "random_state" : 42
@@ -41,7 +43,8 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
 
     # 訓練データ（パラメータチューニング用）とテストデータの分割
     X, y = df.drop(["target"], axis=1), df["target"]
-    X_train, X_test, y_train, y_test = train_test_group_split(X, y, test_size=0.3)
+    X_train, X_test_cal, y_train, y_test_cal = train_test_group_split(X, y, test_size=0.4)
+    X_cal, X_test, y_cal, y_test = train_test_group_split(X_test_cal, y_test_cal, test_size=0.3)
 
     # パラメータチューニング開始
     objective = create_objective(X_train, y_train, splitter=splitter, feature_col=feature_col, params=params)
@@ -64,11 +67,19 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
                     "min_gain_to_split", "max_depth", "learning_rate", "path_smooth"]
         ).show()
 
-    # 訓練データ全体を学習させ、検証データを用いて予想する
+
+    # 訓練データ全体を学習 -> キャリブレーション -> 勝率を予測
+    # 最適化したパラメータで全体を学習
     kwargs = {**params, **study.best_params}
     model = LGBMClassifier(**kwargs)
     model.fit(X_train[feature_col], y_train)
-    pred = model.predict_proba(X_test[feature_col])[:, 1]
+    # キャリブレーション
+    frozen_model = FrozenEstimator(model)
+    calibrator = CalibratedClassifierCV(frozen_model, method="isotonic", n_jobs=-1)
+    calibrator.fit(X_cal[feature_col], y_cal)
+    # 勝率を予測
+    pred = calibrator.predict_proba(X_test[feature_col])[:, 1]
+
 
     # モデルの重要度を表示
     importances = model.booster_.feature_importance(importance_type="gain")
@@ -81,6 +92,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
 
     plt.show()
+
 
     # テストデータで各horse_Nごとのloglossを計算
     prob_calcurated_df = prob_calculator(X_test, pred)
@@ -140,7 +152,7 @@ def create_objective(X, y, splitter, feature_col, params):
             "lambda_l2": trial.suggest_float("lambda_l2", 1e-8, 10.0, log=True),
             "min_gain_to_split": trial.suggest_float("min_gain_to_split", 0, 10),
             "max_depth": trial.suggest_int("max_depth", 2, 100),
-            "learning_rate": trial.suggest_float("learning_rate", 1e-4, 1.0, log=True),
+            "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.5, log=True),
             "path_smooth": trial.suggest_float("path_smooth", 0, 10)
         }
         kwargs = {**params, **tuning_params}
@@ -153,6 +165,10 @@ def create_objective(X, y, splitter, feature_col, params):
             X_train, y_train = X.iloc[tr_idx, :], y.iloc[tr_idx]
             X_test, y_test = X.iloc[val_idx, :], y.iloc[val_idx]
 
+            # weightを指定
+            sample_weight_train = X_train["sample_weight"].values
+            sample_weight_val = X_test["sample_weight"].values
+
             # 要らない列を削除
             X_train, X_test = X_train[feature_col], X_test[feature_col]
 
@@ -162,8 +178,10 @@ def create_objective(X, y, splitter, feature_col, params):
 
             # modelの学習
             model.fit(X_train, y_train,
+                      sample_weight=sample_weight_train,
                       eval_set=[(X_test, y_test)],
                       eval_metric="binary_logloss",
+                      eval_sample_weight=[sample_weight_val],
                       callbacks=callbacks)
 
             # 予測値の取得
@@ -174,9 +192,11 @@ def create_objective(X, y, splitter, feature_col, params):
 
         # NaN ではない部分のみで log_loss を計算
         # y も対応するインデックスでフィルタリングする
-        #oof_df_for_prob_calc = X.loc[not_nan_indices].copy()
-        #oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc, oof_preds[not_nan_indices])
-        avg_logloss = log_loss(y[not_nan_indices], oof_preds[not_nan_indices])
+        oof_df_for_prob_calc = X.copy()
+        oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc[not_nan_indices], oof_preds[not_nan_indices])
+        normalized_prob = oof_preds_normalized_df["pred"]
+        log_loss_weight = X.loc[not_nan_indices, "sample_weight"]
+        avg_logloss = log_loss(y[not_nan_indices], normalized_prob, sample_weight=log_loss_weight)
 
         return avg_logloss
 
