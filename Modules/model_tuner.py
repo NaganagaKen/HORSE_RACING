@@ -12,6 +12,8 @@ from lightgbm import LGBMClassifier
 import time
 import random
 
+plt.rcParams['font.family'] = 'Yu Gothic'
+
 
 def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N.csv",
                     n_trials=100, save_result=True):
@@ -86,7 +88,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     feature_name = pd.Series(model.feature_name_)
     indices = np.argsort(importances)[::-1] 
 
-    plt.figure(figsize=(32,6))
+    plt.figure(figsize=(40,6))
     plt.title("Feature importances")
     plt.bar(range(len(indices)), importances[indices])
     plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")

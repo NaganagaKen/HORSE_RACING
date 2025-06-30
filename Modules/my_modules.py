@@ -53,9 +53,12 @@ def common_process(df_to_copy):
     # 内枠か外枠かを表す特徴量wakuを作成
     df["waku"] = df["waku_num"].apply(lambda x: "inner" if 1<=x<=4 else "outer")
 
-    # 参考: http://www.keiba-lab.jp/exp/up/d_1106.html
-    # 脚質は、逃げ・先行・差しa・差しb・追いa・追いb・後方とする
-    # 逃げ・先行も2分割できるらしいが、ひとまずやめておく
+    # time系の前処理(error_code != 0の時に"----"になる列の処理)
+    time_cols = ["time", "time_diff"]
+    for col in time_cols:
+        df[col] = df[col].replace("----", np.nan)
+        df[col] = df[col].astype(np.float32)
+
 
     # 時系列順に並び替え
     place_dict = {
@@ -93,11 +96,15 @@ def common_process(df_to_copy):
     df["age_type"] = df["age"].apply(lambda x: x if x < 4 else 4)
     df["age_type"] = df["age_type"].replace(age_dict)
 
+    # 距離をビン分割する関数(SMILE区分)
+    df["dist_type"] = pd.cut(df["dist"], [999, 1300, 1899, 2100, 2700, 5000], 
+                            labels=["splint", "mile", "intermediate", "long", "extended"])
+
     # 学習に使う重みを追加
     df["sample_weight"] = 1 / df["horse_N"]
 
     # カテゴリを示す数値列をカテゴリ列に変換
-    to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code", "age_type"]
+    to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code", "age_type", "dist_type"]
     for col in to_category:
         df[col] = df[col].astype("object")
 
