@@ -100,9 +100,6 @@ def common_process(df_to_copy):
     df["dist_type"] = pd.cut(df["dist"], [999, 1300, 1899, 2100, 2700, 5000], 
                             labels=["splint", "mile", "intermediate", "long", "extended"])
 
-    # 学習に使う重みを追加
-    df["sample_weight"] = 1 / df["horse_N"]
-
     # カテゴリを示す数値列をカテゴリ列に変換
     to_category = ["jockey_id", "horse_N", "class_code", "track_code", "age_code", "weight_code", "age_type", "dist_type"]
     for col in to_category:
@@ -192,21 +189,27 @@ def preprocessing(df_to_copy):
 
 # 競馬用の時系列かつグループ単位でバリデーションを行うsplitter
 class GroupTimeSeriesSplit(BaseCrossValidator):
-    def __init__(self, n_splits=5):
+    def __init__(self, n_splits=5, group_col ="id_for_fold"):
         self.n_splits = n_splits
+        self.group_col = group_col
+
+    def _to_series(self, X, groups):
+        if groups is None:
+            return X[self.group_col]
+        if isinstance(groups, str):
+            return X[groups]
+        
+        return pd.Series(groups, index=X.index, name="groups")
 
     def split(self, X, y=None, groups=None):
-        if groups is None:
-            raise ValueError("groups must be provided")
-
-        unique_groups = pd.Series(groups).drop_duplicates().values
+        s_groups = self._to_series(X, groups)
+        unique_groups =s_groups.drop_duplicates().values
         n_groups = len(unique_groups)
 
         if self.n_splits >= n_groups:
             raise ValueError("n_splits must be < n_groups")
 
         test_size = n_groups // (self.n_splits + 1)
-        s_groups = pd.Series(groups)
 
         for i in range(self.n_splits):
             train_end   = (i+1) * test_size

@@ -67,11 +67,11 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_rank", grouping_col=["horse"], feature_name="past_last_3F_rank_mean")
     df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_rank", grouping_col=["horse", "dist"], feature_name="past_last_3F_rank_mean_grouped_dist")
     df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_rank", grouping_col=["horse", "dist_type"], feature_name="past_last_3F_rank_mean_grouped_dist_type")
-    df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_rank", grouping_col=["horse", "dist_type", "waku"], feature_name="past_last_3F_rank_mean_grouped_dist_type")
+    df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_rank", grouping_col=["horse", "dist_type", "waku"], feature_name="past_last_3F_rank_mean_grouped_dist_type_waku")
     df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_time", grouping_col=["horse"], feature_name="past_last_3F_time_mean")
     df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_time", grouping_col=["horse", "dist"], feature_name="past_last_3F_time_mean_grouped_dist")
     df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_time", grouping_col=["horse", "dist_type"], feature_name="past_last_3F_time_mean_grouped_dist_type")
-    df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_time", grouping_col=["horse", "dist_type", "waku"], feature_name="past_last_3F_time_mean_grouped_dist_type")
+    df, feature_col = calc_mean_race_development(df, feature_col, target_col="last_3F_time", grouping_col=["horse", "dist_type", "waku"], feature_name="past_last_3F_time_mean_grouped_dist_type_waku")
 
 
     # 相互作用特徴量を追加
@@ -321,11 +321,15 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     if df.columns.duplicated().any():
         print("★ df に重複列があります → 先頭を残して削除します")
         df = df.loc[:, ~df.columns.duplicated()]
+        feature_col = [c for c in feature_col if c in df.columns]  # DF に残っている列だけ
+        feature_col = list(dict.fromkeys(feature_col)) 
 
-    num_col = df[feature_col].select_dtypes(include=["number"]).columns.tolist()
+    num_col = df[feature_col].select_dtypes(include=["number"]).columns.unique()
     grouped_mean = df.groupby("id_for_fold", observed=True)[num_col].transform("mean")
     grouped_std = df.groupby("id_for_fold", observed=True)[num_col].transform("std")
-    df[num_col] = (df[num_col] - grouped_mean) / grouped_std
+    df.loc[:, num_col] = (df[num_col].astype(np.float32) - grouped_mean) / grouped_std
+
+    print("num_col are standardize")
 
 
     # ランキング特徴量
@@ -345,6 +349,7 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
 
 # ------------------------------------ メイン関数ここまで -------------------------------------------------
+
 def show_df_duplicate_columns(df):
     dup_cols = df.columns[df.columns.duplicated()].unique()
     if len(dup_cols):

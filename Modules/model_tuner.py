@@ -4,6 +4,7 @@ from my_modules import GroupTimeSeriesSplit
 import matplotlib.pyplot as plt
 from IPython.display import display
 import optuna
+from optuna.integration import LightGBMPruningCallback
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
@@ -54,7 +55,8 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         direction="minimize",
         sampler=optuna.samplers.TPESampler(seed=42) # パラメータ探索範囲を確定するには、ここをランダムサンプラーにする。
         )
-    study.optimize(objective, n_trials=n_trials) # 最適化の実行
+    study.optimize(objective, 
+                   n_trials=n_trials) # 最適化の実行
 
     # 調整後のパラメータの表示
     print("Best params : ", study.best_params)
@@ -72,32 +74,54 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
 
     # 訓練データ全体を学習 -> キャリブレーション -> 勝率を予測
     # 最適化したパラメータで全体を学習
-    kwargs = {**params, **study.best_params}
-    model = LGBMClassifier(**kwargs)
-    model.fit(X_train[feature_col], y_train)
+    best_lgbm_params = study.best_params
+    model = LGBMClassifier(**params, **best_lgbm_params)
+    # 全体を学習
+    model.fit(X_train[feature_col], y_train, 
+              eval_set=[(X_cal[feature_col], y_cal)],
+              eval_metric="binary_logloss",
+              callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]) 
+
+    # 過学習していないかチェック
+    y_pred_train = model.predict_proba(X_train[feature_col])[:, 1]
+    y_pred_cal1 = model.predict_proba(X_cal[feature_col])[:, 1]
+    print("Before Calibrating Train Logloss:", log_loss(y_train, y_pred_train))
+    print("Before Calibrating Test  Logloss:", log_loss(y_cal, y_pred_cal1))
+
     # キャリブレーション
     frozen_model = FrozenEstimator(model)
-    calibrator = CalibratedClassifierCV(frozen_model, method="isotonic", n_jobs=-1)
+    calibrator = CalibratedClassifierCV(frozen_model, method="isotonic", n_jobs=-1) # 一旦cvは無しにしておく
     calibrator.fit(X_cal[feature_col], y_cal)
-    # 勝率を予測
-    pred = calibrator.predict_proba(X_test[feature_col])[:, 1]
+    # 勝率を予測（ついでに過学習していないかチェック）
+    y_pred_cal2 = calibrator.predict_proba(X_cal[feature_col])[:, 1]
+    y_pred_test = calibrator.predict_proba(X_test[feature_col])[:, 1]
+    print("Calibrated Train Logloss:", log_loss(y_cal, y_pred_cal2))
+    print("Calibrated Test  Logloss", log_loss(y_test, y_pred_test))
+    print("↑これらは正規化する前のデータを用いていることに注意")
 
 
-    # モデルの重要度を表示
+    # モデルの重要度を表示（gain）
     importances = model.booster_.feature_importance(importance_type="gain")
     feature_name = pd.Series(model.feature_name_)
     indices = np.argsort(importances)[::-1] 
-
     plt.figure(figsize=(40,6))
     plt.title("Feature importances")
     plt.bar(range(len(indices)), importances[indices])
     plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
-
+    plt.show()
+    # モデルの重要度を表示（split)
+    importances = model.booster_.feature_importance(importance_type="split")
+    feature_name = pd.Series(model.feature_name_)
+    indices = np.argsort(importances)[::-1] 
+    plt.figure(figsize=(40,6))
+    plt.title("Feature importances")
+    plt.bar(range(len(indices)), importances[indices])
+    plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
     plt.show()
 
 
     # テストデータで各horse_Nごとのloglossを計算
-    prob_calcurated_df = prob_calculator(X_test, pred)
+    prob_calcurated_df = prob_calculator(X_test, y_pred_test)
     prob_calcurated_df = prob_calcurated_df.set_index(X_test.index) 
     for i in sorted(X.horse_N.unique().tolist()):
         horse_N_index = X_test.horse_N == i
@@ -118,7 +142,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         current_score.extend(logloss_list)
         current_score.append(sum(logloss_list))
         # auc
-        auc_score = roc_auc_score(y_test, pred)
+        auc_score = roc_auc_score(y_test, y_pred_test)
         current_score.append(auc_score)
 
         # DataFrameに変換
@@ -132,7 +156,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         display(update_scores.head(5))
 
     # 返すデータの設定（予測値を埋め込む）
-    X_test = prob_calculator(X_test, pred)
+    X_test = prob_calculator(X_test, y_pred_test)
     X_test.loc[:, "target"] = y_test.values
 
     return model, X_test
@@ -157,33 +181,32 @@ def create_objective(X, y, splitter, feature_col, params):
             "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.5, log=True),
             "path_smooth": trial.suggest_float("path_smooth", 0, 10)
         }
+        # lightGBMに渡すパラメータ
         kwargs = {**params, **tuning_params}
 
         # 交差検証
         oof_preds = np.zeros(len(X))
         oof_preds[:] = np.nan
-        for tr_idx, val_idx in splitter.split(X, y, groups=X["id_for_fold"]):
+        for fold, (tr_idx, val_idx) in enumerate(splitter.split(X, y, groups="id_for_fold")):
 
             X_train, y_train = X.iloc[tr_idx, :], y.iloc[tr_idx]
             X_test, y_test = X.iloc[val_idx, :], y.iloc[val_idx]
-
-            # weightを指定
-            sample_weight_train = X_train["sample_weight"].values
-            sample_weight_val = X_test["sample_weight"].values
 
             # 要らない列を削除
             X_train, X_test = X_train[feature_col], X_test[feature_col]
 
             # modelの宣誓とコールバックの定義
             model = LGBMClassifier(**kwargs)
-            callbacks = [lgb.early_stopping(stopping_rounds=50, verbose=False)] # 50ラウンドで停止
-
+            callbacks = [lgb.early_stopping(stopping_rounds=200, verbose=False)]
+            if fold == 0:
+                # 0 foldで望み薄と判定されたら早期停止する(そこまで性能には影響がない)
+                # 警告が出ないようにしているだけなので、警告が出てもいいなら
+                # if fold == 0の部分だけ削除callbacksは残しておく
+                callbacks.append(LightGBMPruningCallback(trial, "binary_logloss")) 
             # modelの学習
             model.fit(X_train, y_train,
-                      sample_weight=sample_weight_train,
-                      eval_set=[(X_test, y_test)],
+                      eval_set=[(X_test[feature_col], y_test)],
                       eval_metric="binary_logloss",
-                      eval_sample_weight=[sample_weight_val],
                       callbacks=callbacks)
 
             # 予測値の取得
@@ -197,8 +220,7 @@ def create_objective(X, y, splitter, feature_col, params):
         oof_df_for_prob_calc = X.copy()
         oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc[not_nan_indices], oof_preds[not_nan_indices])
         normalized_prob = oof_preds_normalized_df["pred"]
-        log_loss_weight = X.loc[not_nan_indices, "sample_weight"]
-        avg_logloss = log_loss(y[not_nan_indices], normalized_prob, sample_weight=log_loss_weight)
+        avg_logloss = log_loss(y[not_nan_indices], normalized_prob)
 
         return avg_logloss
 
