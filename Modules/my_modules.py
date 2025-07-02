@@ -109,8 +109,9 @@ def common_process(df_to_copy):
     # ターゲット変数の作成
     try:
         # レース検索から得たデータ場合はこの列がある
-        df["target"] = df["rank"].apply(lambda x: 1 if x == 1 else 0)
-        df["target3"] = df["rank"].apply(lambda x: 1 if 1 <= x <= 3 else 0)
+        df["is_1st_rank"] = df["rank"].apply(lambda x: 1 if x == 1 else 0)
+        df["is_in_3rd_rank"] = df["rank"].apply(lambda x: 1 if 1 <= x <= 3 else 0)
+        df["target"] = df["rank"].apply(lambda x: x if 1 <= x <= 3 else 0)
     except:
         # レース検索から得たデータではない場合（出馬表分析等）は何もしない（rank特徴量がない）
         pass

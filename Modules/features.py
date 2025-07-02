@@ -394,20 +394,20 @@ def grouped_horse_winning_rate(df_to_copy, feature_col_to_copy, cols=None):
         return
     
     # 1着の確率で計算
-    grouped = df.groupby(["horse", *cols], observed=True)["target"]
+    grouped = df.groupby(["horse", *cols], observed=True)["is_1st_rank"]
     cumsum = grouped.cumsum()
     count = grouped.cumcount()
     feature_name = "horse_win_rate_" + "_".join(cols)
-    df[feature_name] = (cumsum-df["target"]) / count.replace(0, np.nan)
+    df[feature_name] = (cumsum-df["is_1st_rank"]) / count.replace(0, np.nan)
 
     feature_col.append(feature_name)
 
     # 1-3着の確率で計算
-    grouped = df.groupby(["horse", *cols], observed=True)["target3"]
+    grouped = df.groupby(["horse", *cols], observed=True)["is_in_3rd_rank"]
     cumsum = grouped.cumsum()
     count = grouped.cumcount()
     feature_name = "horse_win_rate3_" + "_".join(cols)
-    df[feature_name] = (cumsum-df["target3"]) / count.replace(0, np.nan)
+    df[feature_name] = (cumsum-df["is_in_3rd_rank"]) / count.replace(0, np.nan)
 
     feature_col.append(feature_name)
 
@@ -422,16 +422,16 @@ def grouped_winning_rate(df_to_copy, feature_col_to_copy, dict_for_df, cols):
     grouped2 = df.groupby(["id_for_fold", *cols], observed=True)
 
     # 同じ条件で1着になるの確率を計算
-    bunsi1 = grouped1["target"].cumsum() - grouped2["target"].cumsum()
-    bunbo1 = grouped1["target"].cumcount() - grouped2["target"].cumcount()
+    bunsi1 = grouped1["is_1st_rank"].cumsum() - grouped2["is_1st_rank"].cumsum()
+    bunbo1 = grouped1["is_1st_rank"].cumcount() - grouped2["is_1st_rank"].cumcount()
 
     feature_name = "all_win_rate_" + "_".join(cols)
     feature_col.append(feature_name)
     dict_for_df[feature_name] = bunsi1 / bunbo1.replace(0, np.nan)
 
     # 同じ条件で1-3着になるの確率を計算
-    bunsi3 = grouped1["target3"].cumsum() - grouped2["target3"].cumsum()
-    bunbo3 = grouped1["target3"].cumcount() - grouped2["target3"].cumcount()
+    bunsi3 = grouped1["is_in_3rd_rank"].cumsum() - grouped2["is_in_3rd_rank"].cumsum()
+    bunbo3 = grouped1["is_in_3rd_rank"].cumcount() - grouped2["is_in_3rd_rank"].cumcount()
 
     feature_name3 = "all_win_rate3_" + "_".join(cols)
     feature_col.append(feature_name3)

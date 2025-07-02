@@ -1,22 +1,24 @@
 import pandas as pd
 import numpy as np
+import scipy.special
 from my_modules import GroupTimeSeriesSplit
 import matplotlib.pyplot as plt
 from IPython.display import display
 import optuna
 from optuna.integration import LightGBMPruningCallback
 from sklearn.metrics import log_loss, roc_auc_score
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.frozen import FrozenEstimator
 import lightgbm as lgb
 from lightgbm import LGBMClassifier
+import scipy
+from scipy.optimize import minimize
 import time
 import random
 
 plt.rcParams['font.family'] = 'Yu Gothic'
 
 
-def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N.csv",
+# 多クラス分類用の関数
+def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N.csv",
                     n_trials=100, save_result=True):
     splitter = GroupTimeSeriesSplit(n_splits=5)
     
@@ -27,8 +29,8 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
 
     # 確定パラメータの定義
     params = {
-        "objective" : "binary",
-        "metric" : "binary_logloss",
+        "objective" : "multiclass",
+        "metric" : "multi_logloss",
         "n_estimators": 5000,
         "n_jobs" : -1,
         "verbose" : -1,
@@ -45,7 +47,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     # ---- ここから学習開始 ----
 
     # 訓練データ（パラメータチューニング用）とテストデータの分割
-    X, y = df.drop(["is_1st_rank"], axis=1), df["is_1st_rank"]
+    X, y = df.drop(["target"], axis=1), df["target"]
     X_train, X_test_cal, y_train, y_test_cal = train_test_group_split(X, y, test_size=0.4)
     X_cal, X_test, y_cal, y_test = train_test_group_split(X_test_cal, y_test_cal, test_size=0.3)
 
@@ -79,24 +81,26 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     # 全体を学習
     model.fit(X_train[feature_col], y_train, 
               eval_set=[(X_cal[feature_col], y_cal)],
-              eval_metric="binary_logloss",
+              eval_metric="multi_logloss",
               callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]) 
 
     # 過学習していないかチェック
-    y_pred_train = model.predict_proba(X_train[feature_col])[:, 1]
-    y_pred_cal1 = model.predict_proba(X_cal[feature_col])[:, 1]
+    y_pred_train = model.predict_proba(X_train[feature_col])
+    y_pred_cal = model.predict_proba(X_cal[feature_col])
     print("Before Calibrating Train Logloss:", log_loss(y_train, y_pred_train))
-    print("Before Calibrating Test  Logloss:", log_loss(y_cal, y_pred_cal1))
+    print("Before Calibrating Test  Logloss:", log_loss(y_cal, y_pred_cal))
 
     # キャリブレーション
-    frozen_model = FrozenEstimator(model)
-    calibrator = CalibratedClassifierCV(frozen_model, method="isotonic", n_jobs=-1) # 一旦cvは無しにしておく
-    calibrator.fit(X_cal[feature_col], y_cal)
+    y_pred_cal_raw = model.predict_proba(X_cal[feature_col], raw_score=True)
+    y_pred_test_raw = model.predict_proba(X_test[feature_col], raw_score=True)
+    
+    T = temperature_scaling(y_pred_cal_raw, y_cal)
+
+    y_pred_cal_calibrated = scipy.special.softmax(y_pred_cal_raw / T, axis=1)
+    y_pred_test_calibrated = scipy.special.softmax(y_pred_test_raw / T, axis=1)
     # 勝率を予測（ついでに過学習していないかチェック）
-    y_pred_cal2 = calibrator.predict_proba(X_cal[feature_col])[:, 1]
-    y_pred_test = calibrator.predict_proba(X_test[feature_col])[:, 1]
-    print("Calibrated Train Logloss:", log_loss(y_cal, y_pred_cal2))
-    print("Calibrated Test  Logloss", log_loss(y_test, y_pred_test))
+    print("Calibrated Train Logloss:", log_loss(y_cal, y_pred_cal_calibrated))
+    print("Calibrated Test  Logloss", log_loss(y_test, y_pred_test_calibrated))
     print("↑これらは正規化する前のデータを用いていることに注意")
 
 
@@ -105,7 +109,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     feature_name = pd.Series(model.feature_name_)
     indices = np.argsort(importances)[::-1] 
     plt.figure(figsize=(40,6))
-    plt.title("Feature importances")
+    plt.title("Feature importances (gain)")
     plt.bar(range(len(indices)), importances[indices])
     plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
     plt.show()
@@ -114,18 +118,20 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
     feature_name = pd.Series(model.feature_name_)
     indices = np.argsort(importances)[::-1] 
     plt.figure(figsize=(40,6))
-    plt.title("Feature importances")
+    plt.title("Feature importances (split)")
     plt.bar(range(len(indices)), importances[indices])
     plt.xticks(range(len(indices)), feature_name[indices], rotation=90, fontsize="xx-small")
     plt.show()
 
 
     # テストデータで各horse_Nごとのloglossを計算
-    prob_calcurated_df = prob_calculator(X_test, y_pred_test)
+    prob_calcurated_df = prob_calculator_multiclass(X_test, y_pred_test_calibrated)
     prob_calcurated_df = prob_calcurated_df.set_index(X_test.index) 
+    display(prob_calcurated_df.tail())
     for i in sorted(X.horse_N.unique().tolist()):
         horse_N_index = X_test.horse_N == i
-        prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, "pred"]
+        target_name = [f"pred_{i}_row" for i in range(4)]
+        prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, target_name]
         logloss_score = log_loss(y_test[horse_N_index], prob_calcurate_horse_N)
         logloss_of_each_horse_N.append(tuple([i, logloss_score]))
 
@@ -142,7 +148,7 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         current_score.extend(logloss_list)
         current_score.append(sum(logloss_list))
         # auc
-        auc_score = roc_auc_score(y_test, y_pred_test)
+        auc_score = roc_auc_score(y_test, y_pred_test_calibrated) # グローバルAUC(正規化前の確率を計算)
         current_score.append(auc_score)
 
         # DataFrameに変換
@@ -156,8 +162,8 @@ def simple_lightGBM(df, feature_col, visualization=False, memo="None", scores_pa
         display(update_scores.head(5))
 
     # 返すデータの設定（予測値を埋め込む）
-    X_test = prob_calculator(X_test, y_pred_test)
-    X_test.loc[:, "is_1st_rank"] = y_test.values
+    X_test = prob_calculator_multiclass(X_test, y_pred_test_calibrated)
+    X_test.loc[:, "target"] = y_test.values
 
     return model, X_test
 
@@ -185,8 +191,7 @@ def create_objective(X, y, splitter, feature_col, params):
         kwargs = {**params, **tuning_params}
 
         # 交差検証
-        oof_preds = np.zeros(len(X))
-        oof_preds[:] = np.nan
+        oof_preds = np.full((len(X), 4), np.nan)
         for fold, (tr_idx, val_idx) in enumerate(splitter.split(X, y, groups="id_for_fold")):
 
             X_train, y_train = X.iloc[tr_idx, :], y.iloc[tr_idx]
@@ -202,25 +207,22 @@ def create_objective(X, y, splitter, feature_col, params):
                 # 0 foldで望み薄と判定されたら早期停止する(そこまで性能には影響がない)
                 # 警告が出ないようにしているだけなので、警告が出てもいいなら
                 # if fold == 0の部分だけ削除callbacksは残しておく
-                callbacks.append(LightGBMPruningCallback(trial, "binary_logloss")) 
+                callbacks.append(LightGBMPruningCallback(trial, "multi_logloss")) 
             # modelの学習
             model.fit(X_train, y_train,
                       eval_set=[(X_test[feature_col], y_test)],
-                      eval_metric="binary_logloss",
+                      eval_metric="multi_logloss",
                       callbacks=callbacks)
 
             # 予測値の取得
-            oof_preds[val_idx] = model.predict_proba(X_test)[:, 1]
+            oof_preds[val_idx] = model.predict_proba(X_test[feature_col])
 
         # NaN ではない部分のインデックスを取得
-        not_nan_indices = ~np.isnan(oof_preds)
+        not_nan_indices = ~np.isnan(oof_preds).any(axis=1)
 
-        # NaN ではない部分のみで log_loss を計算
-        # y も対応するインデックスでフィルタリングする
-        oof_df_for_prob_calc = X.copy()
-        oof_preds_normalized_df = prob_calculator(oof_df_for_prob_calc[not_nan_indices], oof_preds[not_nan_indices])
-        normalized_prob = oof_preds_normalized_df["pred"]
-        avg_logloss = log_loss(y[not_nan_indices], normalized_prob)
+        # NaN ではない部分のみでmulti_logloss を計算
+        # レース内で正規化する前でmulti_loglossを計算する
+        avg_logloss = log_loss(y[not_nan_indices], oof_preds[not_nan_indices])
 
         return avg_logloss
 
@@ -228,20 +230,62 @@ def create_objective(X, y, splitter, feature_col, params):
 
 
 # 予測確率を正規化する関数
-def prob_calculator(df_to_copy, prob):
+def prob_calculator_multiclass(
+        df_to_copy: pd.DataFrame,
+        prob: np.ndarray,
+        class_names=None,
+        group_col: str = "id_for_fold",
+        epsilon: float = 1e-15,
+) -> pd.DataFrame:
+    """
+    レース単位（group_col ごと）で *クラスごとの確率総和＝1* になるよう正規化する。
+
+    Parameters
+    ----------
+    df_to_copy : pd.DataFrame
+        馬ごとの元データ（行 = 馬）。
+    prob : np.ndarray, shape = (n_samples, n_classes)
+        LightGBM などが返す確率行列（softmax 済み or 温度スケール後など）。
+    class_names : list[str] | None
+        列名に用いるクラス名。None の場合は ["class_0", "class_1", …] を自動生成。
+    group_col : str
+        レース ID を示す列名。デフォルトは "id_for_fold"。
+    epsilon : float
+        0 や 1 で LogLoss が発散しないようにするクリップ値。
+
+    Returns
+    -------
+    pd.DataFrame
+        元データに `pred_{class}` 列を追加した DataFrame。
+        *レース単位* で各クラス確率の合計が 1 になる。
+    """
     df = df_to_copy.copy()
 
-    # 予測確率をクリッピングして、完全に0や1にならないようにする (LogLossの安定化)
-    epsilon = 1e-15 # ごく小さい値
-    df["unnormalized_prob"] = np.clip(prob, epsilon, 1 - epsilon)
-    # FutureWarningを避けるためにobserved=Falseを追加
-    sum_prob = df.groupby(["id_for_fold"], observed=False)["unnormalized_prob"].sum()
-    sum_prob = pd.DataFrame({"sum_prob": sum_prob})
-    df = pd.merge(df, sum_prob, how="left", on="id_for_fold")
-    df.index = df_to_copy.index # mergeでインデックスがリセットされたので、元に戻す
-    df["pred"] = df["unnormalized_prob"] / df["sum_prob"]
+    # --- 0. クラス名を決定 ---
+    n_classes = prob.shape[1]
+    if class_names is None:
+        class_names = [f"class_{i}" for i in range(n_classes)]
 
-    df = df.drop(["unnormalized_prob", "sum_prob"], axis=1)
+    # --- 1. クリッピング（数値安定化） ---
+    prob_clip = np.clip(prob, epsilon, 1.0 - epsilon)
+
+    # --- 2. レース単位で正規化 ---
+    for j, cls in enumerate(class_names):
+        if cls == "class_0":
+            continue
+        col_pred = f"pred_{cls}"
+        df[col_pred] = prob_clip[:, j]
+
+        # レース内のクラス確率総和
+        race_sum = df.groupby(group_col, observed=False)[col_pred].transform("sum")
+        df[col_pred] /= race_sum          # レース単位で合計 = 1 へ再スケール
+
+    # --- 3. 行単位で正規化 ---
+    row_sum = prob_clip.sum(axis=1)
+    for i in range(n_classes):
+        prob_name = f"pred_{i}_row"
+        df[prob_name] = prob_clip[:, i] / row_sum
+
     return df
 
 
@@ -263,3 +307,20 @@ def train_test_group_split(X, y, test_size=0.2, groups="id_for_fold"):
     X_test, y_test = X.iloc[test_idx, :], y.iloc[test_idx]
 
     return X_train, X_test, y_train, y_test
+
+
+# temperature_scaling
+def temperature_scaling(logits_val, y_val):
+    """
+    logits_val : shape (N, C)  : LightGBM の predict(before_softmax=True) 相当
+    y_val      : shape (N,)    : 0〜C-1
+    """
+    # 負の対数尤度を最小化する温度 T を求める
+    def nll(T):
+        T = T[0]
+        # ソフトマックス
+        proba = scipy.special.softmax(logits_val / T, axis=1)
+        return log_loss(y_val, proba)
+
+    best_T = minimize(nll, x0=[1.0], bounds=[(0.05, 10)]).x[0]
+    return best_T
