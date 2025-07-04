@@ -125,10 +125,10 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     # レーティングの相互作用特徴量を追加
     poly = PolynomialFeatures(degree=2, include_bias=False, interaction_only=True)
     poly_list = ['horse_TrueSkill', 'horse_TrueSkill_min',
-                         'horse_TrueSkill_max', 'jockey_TrueSkill',
-                         'jockey_TrueSkill_min', 'jockey_TrueSkill_max', 'horse_EloRating', 
-                         'jockey_EloRating', 'horse_Glicko2',
-                         'horse_Glicko2_min', 'horse_Glicko2_max']
+                        'horse_TrueSkill_max', 'jockey_TrueSkill',
+                        'jockey_TrueSkill_min', 'jockey_TrueSkill_max', 'horse_EloRating', 
+                        'jockey_EloRating', 'horse_Glicko2',
+                        'horse_Glicko2_min', 'horse_Glicko2_max']
     poly_features = poly.fit_transform(df[poly_list])
     poly_features_name = poly.get_feature_names_out(poly_list)
     poly_features_df = pd.DataFrame(poly_features, columns=poly_features_name, index=df.index)
@@ -227,6 +227,8 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["father"])
     df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["broodmare_sire"])
     df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["mother"])
+    df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["father", "mother"])
+    df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["father", "broodmare_sire"])
 
     # --- 後でもう少し追加予定 --- 
 
@@ -325,9 +327,13 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
         feature_col = list(dict.fromkeys(feature_col)) 
 
     num_col = df[feature_col].select_dtypes(include=["number"]).columns.unique()
+    for col in num_col:
+        if np.issubdtype(df[col].dtype, int):
+            df[col] = df[col].astype(np.float64)   
+    
     grouped_mean = df.groupby("id_for_fold", observed=True)[num_col].transform("mean")
     grouped_std = df.groupby("id_for_fold", observed=True)[num_col].transform("std")
-    df.loc[:, num_col] = (df[num_col].astype(np.float32) - grouped_mean) / grouped_std
+    df.loc[:, num_col] = ((df[num_col] - grouped_mean) / grouped_std).astype(np.float32)
 
     print("num_col are standardize")
 

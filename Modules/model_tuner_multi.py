@@ -18,7 +18,7 @@ plt.rcParams['font.family'] = 'Yu Gothic'
 
 
 # 多クラス分類用の関数
-def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N.csv",
+def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N_multi.csv",
                     n_trials=100, save_result=True):
     splitter = GroupTimeSeriesSplit(n_splits=5)
     
@@ -41,8 +41,6 @@ def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_pat
     cat_col = df.select_dtypes(include=["object"]).columns.tolist()
     for col in cat_col:
         df[col] = df[col].astype("category")
-
-    logloss_of_each_horse_N = []
 
     # ---- ここから学習開始 ----
 
@@ -103,6 +101,8 @@ def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_pat
     print("Calibrated Test  Logloss", log_loss(y_test, y_pred_test_calibrated))
     print("↑これらは正規化する前のデータを用いていることに注意")
 
+    # Breier_scoreも提示したい。
+
 
     # モデルの重要度を表示（gain）
     importances = model.booster_.feature_importance(importance_type="gain")
@@ -125,20 +125,24 @@ def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_pat
 
 
     # テストデータで各horse_Nごとのloglossを計算
+    # X_testとy_pred_test_calibratedを結合
     prob_calcurated_df = prob_calculator_multiclass(X_test, y_pred_test_calibrated)
     prob_calcurated_df = prob_calcurated_df.set_index(X_test.index) 
-    display(prob_calcurated_df.tail())
-    for i in sorted(X.horse_N.unique().tolist()):
+    logloss_of_each_horse_N = []
+
+    target_name = [f"pred_{j}_row" for j in range(4)]
+    for i in sorted(X_test.horse_N.unique().tolist()):
         horse_N_index = X_test.horse_N == i
-        target_name = [f"pred_{i}_row" for i in range(4)]
         prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, target_name]
         logloss_score = log_loss(y_test[horse_N_index], prob_calcurate_horse_N)
         logloss_of_each_horse_N.append(tuple([i, logloss_score]))
+    print("logloss:",logloss_of_each_horse_N)
 
 
     # データを書き込み
     if save_result:
-        old_scores = pd.read_csv(scores_path)
+        old_scores = pd.read_csv(scores_path) 
+
         # 登録時間
         now = time.ctime()
         cnvtime = time.strptime(now)
@@ -146,10 +150,16 @@ def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_pat
         # loglossスコア
         logloss_list = [score for i, score in logloss_of_each_horse_N]
         current_score.extend(logloss_list)
-        current_score.append(sum(logloss_list))
-        # auc
-        auc_score = roc_auc_score(y_test, y_pred_test_calibrated) # グローバルAUC(正規化前の確率を計算)
-        current_score.append(auc_score)
+        all_logloss = (prob_calcurated_df[target_name], y_test)
+        current_score.append(all_logloss)
+        print("logloss is saved")
+        # グローバルAUC(正規化前の確率を計算)、ovr, ovoの両方を計算
+        auc_score_ovr = roc_auc_score(y_test, y_pred_test_calibrated, multi_class="ovr") 
+        current_score.append(auc_score_ovr)
+        auc_score_ovo = roc_auc_score(y_test, y_pred_test_calibrated, multi_class="ovo")
+        current_score.append(auc_score_ovo)
+        # 後で、正規化後のaucも加えたい。
+        print("auc_score is saved")
 
         # DataFrameに変換
         current_data_dict = dict()
@@ -158,7 +168,7 @@ def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_pat
             current_data_dict[col_name] = data
         current_score_df = pd.DataFrame([current_data_dict])
         update_scores = pd.concat([current_score_df, old_scores], ignore_index=True)
-        update_scores.to_csv("../Memo/logloss_score_of_each_horse_N.csv", index=False)
+        update_scores.to_csv(scores_path, index=False)
         display(update_scores.head(5))
 
     # 返すデータの設定（予測値を埋め込む）
@@ -177,15 +187,16 @@ def create_objective(X, y, splitter, feature_col, params):
             "num_leaves": trial.suggest_int("num_leaves", 2, 100),
             "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 1, 50),
             "min_sum_hessian_in_leaf": trial.suggest_float("min_sum_hessian_in_leaf", 1e-8, 10),
-            "bagging_fraction": trial.suggest_float("bagging_fraction", 0.2, 1.0),
+            "bagging_fraction": trial.suggest_float("bagging_fraction", 0.2, 0.99),
             "bagging_freq": trial.suggest_int("bagging_freq", 1, 100),
             "feature_fraction": trial.suggest_float("feature_fraction", 0.1, 1.0),
-            "lambda_l1": trial.suggest_float("lambda_l1", 1e-8, 10.0, log=True),
-            "lambda_l2": trial.suggest_float("lambda_l2", 1e-8, 10.0, log=True),
+            "lambda_l1": trial.suggest_float("lambda_l1", 1e-8, 100.0, log=True),
+            "lambda_l2": trial.suggest_float("lambda_l2", 1e-8, 100.0, log=True),
             "min_gain_to_split": trial.suggest_float("min_gain_to_split", 0, 10),
             "max_depth": trial.suggest_int("max_depth", 2, 100),
             "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.5, log=True),
-            "path_smooth": trial.suggest_float("path_smooth", 0, 10)
+            "path_smooth": trial.suggest_float("path_smooth", 0, 10),
+            "feature_fraction_bynode": trial.suggest_float("feature_fraction_bynode", 0.6, 0.8)
         }
         # lightGBMに渡すパラメータ
         kwargs = {**params, **tuning_params}
@@ -202,20 +213,16 @@ def create_objective(X, y, splitter, feature_col, params):
 
             # modelの宣誓とコールバックの定義
             model = LGBMClassifier(**kwargs)
-            callbacks = [lgb.early_stopping(stopping_rounds=200, verbose=False)]
-            if fold == 0:
-                # 0 foldで望み薄と判定されたら早期停止する(そこまで性能には影響がない)
-                # 警告が出ないようにしているだけなので、警告が出てもいいなら
-                # if fold == 0の部分だけ削除callbacksは残しておく
-                callbacks.append(LightGBMPruningCallback(trial, "multi_logloss")) 
+            callbacks = [lgb.early_stopping(stopping_rounds=50, verbose=False),
+                         LightGBMPruningCallback(trial, "multi_logloss")] 
             # modelの学習
             model.fit(X_train, y_train,
-                      eval_set=[(X_test[feature_col], y_test)],
+                      eval_set=[(X_test, y_test)],
                       eval_metric="multi_logloss",
                       callbacks=callbacks)
 
             # 予測値の取得
-            oof_preds[val_idx] = model.predict_proba(X_test[feature_col])
+            oof_preds[val_idx] = model.predict_proba(X_test)
 
         # NaN ではない部分のインデックスを取得
         not_nan_indices = ~np.isnan(oof_preds).any(axis=1)
