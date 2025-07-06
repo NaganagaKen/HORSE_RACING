@@ -7,12 +7,20 @@ from collections import defaultdict
 from glicko2 import Player
 from sklearn.preprocessing import PolynomialFeatures
 
+pd.option_context(
+        'display.max_info_rows', None,     # 行しきい値を無制限
+        'display.max_info_columns', None
+        )
+
 
 # 勝率予測用特徴量エンジニアリング関数
-def feature_engineering(df_to_copy, feature_col_to_copy=None):
+def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="../Data/tansho/tansho_2021_2025.csv"):
     if feature_col_to_copy == None :
         # ブリンカーはあまり重要ではなさそうなので入れない
         feature_col_to_copy = ["waku_num", "horse_num", "sex", "age", "basis_weight", "weight", "inc_dec"]
+    if tansho_odds_path is None:
+        raise ValueError("Error in merge_last_N_odds: tansho_odds_path must be specified")
+
     feature_col = feature_col_to_copy.copy()
     df = df_to_copy.copy()
 
@@ -311,8 +319,8 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
     print("group_winning_rate_calculated")
 
     # 過去オッズの追加(gainが高すぎるので一度加えないでおく)
-    df, feature_col = merge_last_N_odds(df, feature_col)
-    ranking_col.append("pre_win_odds_20")
+    df, feature_col = merge_last_N_odds(df, feature_col, tansho_odds_path=tansho_odds_path)
+    ranking_col.append("tansho_odds_20")
     print("added last odds")
 
     ## ここから開始
@@ -328,12 +336,12 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None):
 
     num_col = df[feature_col].select_dtypes(include=["number"]).columns.unique()
     for col in num_col:
-        if np.issubdtype(df[col].dtype, int):
+        if np.issubdtype(df[col].dtype, np.integer): # intではなくnp.integerを指定しないといけない
             df[col] = df[col].astype(np.float64)   
     
     grouped_mean = df.groupby("id_for_fold", observed=True)[num_col].transform("mean")
     grouped_std = df.groupby("id_for_fold", observed=True)[num_col].transform("std")
-    df.loc[:, num_col] = ((df[num_col] - grouped_mean) / grouped_std).astype(np.float32)
+    df.loc[:, num_col] = ((df[num_col] - grouped_mean) / grouped_std).astype(np.float64)
 
     print("num_col are standardize")
 
@@ -800,12 +808,14 @@ def calc_rating_diff(df, feature_col, target_col=None, prefix=None):
 
 
 # オッズデータと結合する関数
-def merge_last_N_odds(df, feature_col):
+def merge_last_N_odds(df, feature_col, tansho_odds_path=None):
+    if tansho_odds_path is None:
+        raise ValueError("Error in merge_last_N_odds: tansho_odds_path must be specified")
     # 過学習抑制の為にオッズ情報をなるべく加えない（5分前オッズのみを加える）。
-    odds_df = pd.read_csv("../Data/Time_Series_Odds_win_odds.csv", encoding="shift-jis")
-    odds_df_selected =  odds_df[["race_id", "pre_win_odds_20"]]
+    odds_df = pd.read_csv(tansho_odds_path, encoding="shift-jis")
+    odds_df_selected =  odds_df[["race_id", "tansho_odds_20"]]
 
-    new_feature_col = feature_col + ["pre_win_odds_20"]
+    new_feature_col = feature_col + ["tansho_odds_20"]
 
     df = pd.merge(left=df, right=odds_df_selected, how="left", on=["race_id"])
 

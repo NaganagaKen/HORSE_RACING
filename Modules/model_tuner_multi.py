@@ -13,14 +13,23 @@ import scipy
 from scipy.optimize import minimize
 import time
 import random
+import warnings
 
 plt.rcParams['font.family'] = 'Yu Gothic'
+# optunaのLightGBMPruningCallbackの警告を無視する設定
+warnings.filterwarnings(
+    "ignore",
+    message=r"The reported value is ignored because this `step` .* is already reported\.",
+    category=UserWarning,
+    module="optuna"
+)
 
 
 # 多クラス分類用の関数
 def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_path="../Memo/logloss_score_of_each_horse_N_multi.csv",
                     n_trials=100, save_result=True):
-    splitter = GroupTimeSeriesSplit(n_splits=5)
+    
+    splitter = GroupTimeSeriesSplit(n_splits=8)
     
     # 乱数シードを固定
     np.random.seed(42)
@@ -131,43 +140,45 @@ def multi_lightGBM(df, feature_col, visualization=False, memo="None", scores_pat
     logloss_of_each_horse_N = []
 
     target_name = [f"pred_{j}_row" for j in range(4)]
-    for i in sorted(X_test.horse_N.unique().tolist()):
+    for i in range(5, 19):
         horse_N_index = X_test.horse_N == i
         prob_calcurate_horse_N = prob_calcurated_df.loc[horse_N_index, target_name]
-        logloss_score = log_loss(y_test[horse_N_index], prob_calcurate_horse_N)
-        logloss_of_each_horse_N.append(tuple([i, logloss_score]))
-    print("logloss:",logloss_of_each_horse_N)
-
+        try:
+            logloss_score = log_loss(y_test[horse_N_index], prob_calcurate_horse_N)
+            logloss_of_each_horse_N.append(tuple([i, logloss_score]))
+        except:
+            # レースが存在しない場合はnp.nanを代入
+            logloss_of_each_horse_N.append(tuple([i, np.nan]))
 
     # データを書き込み
     if save_result:
-        old_scores = pd.read_csv(scores_path) 
-
+        current_data_dict = dict() # ここにデータを追加していく
         # 登録時間
         now = time.ctime()
         cnvtime = time.strptime(now)
-        current_score = [time.strftime("%Y/%m/%d %H:%M", cnvtime), memo] # これにスコアを追加していく
+        current_data_dict["date"] = time.strftime("%Y/%m/%d %H:%M", cnvtime)
+        # メモ
+        current_data_dict["memo"] = memo
         # loglossスコア
-        logloss_list = [score for i, score in logloss_of_each_horse_N]
-        current_score.extend(logloss_list)
-        all_logloss = (prob_calcurated_df[target_name], y_test)
-        current_score.append(all_logloss)
+        for i, logloss_score in logloss_of_each_horse_N:
+            current_data_dict[f"horse_{i}"] = logloss_score
+        all_logloss = log_loss(y_true=y_test, y_pred=prob_calcurated_df[target_name])
+        current_data_dict["all_logloss"] = all_logloss
         print("logloss is saved")
-        # グローバルAUC(正規化前の確率を計算)、ovr, ovoの両方を計算
+        # グローバルAUC(正規化前の確率を計算)、ovrを計算
         auc_score_ovr = roc_auc_score(y_test, y_pred_test_calibrated, multi_class="ovr") 
-        current_score.append(auc_score_ovr)
-        auc_score_ovo = roc_auc_score(y_test, y_pred_test_calibrated, multi_class="ovo")
-        current_score.append(auc_score_ovo)
+        current_data_dict["auc(ovr)"] = auc_score_ovr
         # 後で、正規化後のaucも加えたい。
         print("auc_score is saved")
 
-        # DataFrameに変換
-        current_data_dict = dict()
-        data_col_name = old_scores.columns.tolist()
-        for data ,col_name in zip(current_score, data_col_name):
-            current_data_dict[col_name] = data
+        try:
+            old_scores = pd.read_csv(scores_path) 
+        except:
+            score_table_cols = ["date", "memo"] + [f"horse_{i}" for i in range(5, 19)] + ["all_logloss", "auc(ovr)"]
+            print("指定されたパスにファイルがなかったので、新しくファイルを生成しました。")
+            old_scores = pd.DataFrame(columns=score_table_cols)
         current_score_df = pd.DataFrame([current_data_dict])
-        update_scores = pd.concat([current_score_df, old_scores], ignore_index=True)
+        update_scores = pd.concat([current_score_df, old_scores], axis=0)
         update_scores.to_csv(scores_path, index=False)
         display(update_scores.head(5))
 
@@ -185,9 +196,9 @@ def create_objective(X, y, splitter, feature_col, params):
         tuning_params = {
             "max_bin": trial.suggest_int("max_bin", 10, 255),
             "num_leaves": trial.suggest_int("num_leaves", 2, 100),
-            "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 1, 50),
+            "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 20, 100),
             "min_sum_hessian_in_leaf": trial.suggest_float("min_sum_hessian_in_leaf", 1e-8, 10),
-            "bagging_fraction": trial.suggest_float("bagging_fraction", 0.2, 0.99),
+            "bagging_fraction": trial.suggest_float("bagging_fraction", 0.4, 0.8),
             "bagging_freq": trial.suggest_int("bagging_freq", 1, 100),
             "feature_fraction": trial.suggest_float("feature_fraction", 0.1, 1.0),
             "lambda_l1": trial.suggest_float("lambda_l1", 1e-8, 100.0, log=True),
@@ -195,8 +206,9 @@ def create_objective(X, y, splitter, feature_col, params):
             "min_gain_to_split": trial.suggest_float("min_gain_to_split", 0, 10),
             "max_depth": trial.suggest_int("max_depth", 2, 100),
             "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.5, log=True),
-            "path_smooth": trial.suggest_float("path_smooth", 0, 10),
-            "feature_fraction_bynode": trial.suggest_float("feature_fraction_bynode", 0.6, 0.8)
+            "path_smooth": trial.suggest_float("path_smooth", 1, 5),
+            "feature_fraction_bynode": trial.suggest_float("feature_fraction_bynode", 0.6, 0.8),
+            "extra_trees": trial.suggest_categorical("extra_trees", [True, False])
         }
         # lightGBMに渡すパラメータ
         kwargs = {**params, **tuning_params}
@@ -213,8 +225,11 @@ def create_objective(X, y, splitter, feature_col, params):
 
             # modelの宣誓とコールバックの定義
             model = LGBMClassifier(**kwargs)
-            callbacks = [lgb.early_stopping(stopping_rounds=50, verbose=False),
-                         LightGBMPruningCallback(trial, "multi_logloss")] 
+            callbacks = [
+                lgb.early_stopping(stopping_rounds=50, verbose=False),
+                LightGBMPruningCallback(trial, "multi_logloss")
+                ]
+             
             # modelの学習
             model.fit(X_train, y_train,
                       eval_set=[(X_test, y_test)],
@@ -228,7 +243,7 @@ def create_objective(X, y, splitter, feature_col, params):
         not_nan_indices = ~np.isnan(oof_preds).any(axis=1)
 
         # NaN ではない部分のみでmulti_logloss を計算
-        # レース内で正規化する前でmulti_loglossを計算する
+        # レース内で正規化する前のmulti_loglossを計算する
         avg_logloss = log_loss(y[not_nan_indices], oof_preds[not_nan_indices])
 
         return avg_logloss
