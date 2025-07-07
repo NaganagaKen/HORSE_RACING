@@ -6,6 +6,13 @@ from itertools import combinations
 from collections import defaultdict
 from glicko2 import Player
 from sklearn.preprocessing import PolynomialFeatures
+from pathlib import Path
+import sys
+
+module_path = (Path().resolve().parent/ "Modules")
+sys.path.append(str(module_path))
+
+from skill_calculators import trueskill_calcluator
 
 pd.option_context(
         'display.max_info_rows', None,     # 行しきい値を無制限
@@ -109,9 +116,13 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="
 
 
     # TrueSkillの計算
-    print("calculating trueskill is in progress")
-    df, feature_col = calc_trueskill_fast(df, feature_col, "horse", "horse") ###
-    df, feature_col = calc_trueskill_fast(df, feature_col, "jockey_id", "jockey") ###
+    print("calculating horse trueskill is in progress")
+    horse_ts_calculator = trueskill_calcluator("horse", "horse")
+    df, feature_col = horse_ts_calculator.fit_transform(df, feature_col) ###
+    
+    print("calculating jockey trueskill is in progress")
+    jockey_ts_calculator = trueskill_calcluator("jockey_id", "jockey")
+    df, feature_col = jockey_ts_calculator.fit_transform(df, feature_col) ###
 
     # EloRatingの計算
     print("calculating EloRating is in progress")
@@ -546,7 +557,7 @@ def calc_trueskill_fast(df_to_copy, feature_col, target_col, prefix):
     # 元のfeature_colリストを変更しないように新しいリストを作成
     new_feature_col = feature_col.copy()
 
-    CONFIDENCE_MULTIPLIER = 3
+    CONFIDENCE_MULTIPLIER = 3 # シグマ範囲を設定
 
     # 新しく追加する列名を事前に定義
     ts_mu_col = f"{prefix}_TrueSkill"
