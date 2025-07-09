@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 from trueskill import TrueSkill
+from glicko2 import Player
 from collections import defaultdict
+from itertools import combinations
 
-
-class trueskill_calcluator:
+# trueskillを計算するクラス
+class trueskill_calculator:
     def __init__(self, target_col, prefix, CONFIDENCE_MULTIPLIER=3):
         self.target_col = target_col # dataframe内のどの列のtrueskillを計算するか
         self.prefix = prefix # 列名の指定
@@ -91,7 +93,6 @@ class trueskill_calcluator:
         result_df = pd.concat(processed_groups).sort_values(by="datetime", ascending=True)
 
         return result_df, new_feature_col
-    
 
     # 新しいレースで予測したい場合はこちらを呼び出す
     def transform(self, df, feature_col):
@@ -128,3 +129,262 @@ class trueskill_calcluator:
         df[ts_max_col] = mu_series + sigma_series * CONFIDENCE_MULTIPLIER
 
         return df, new_feature_col
+    
+
+
+# Elo Rating計算するクラス
+class elorating_calculator:
+    def __init__(self, K=32, target_col=None, prefix=None):
+        if (target_col is None) or (prefix is None):
+            raise ValueError("target_col and prefix must be specified")
+        self.K = K
+        self.target_col = target_col
+        self.prefix = prefix
+    
+    def fit_transform(self, df, feature_col):
+        K = self.K
+        target_col = self.target_col
+        prefix = self.prefix
+        
+        # 元のデータを変更しないようにコピーを作成しておく
+        df = df.copy()
+        new_feature_col = feature_col.copy()
+        new_feature_col.append(f"{prefix}_EloRating")
+
+        # レート保存用辞書
+        self.ratings = defaultdict(lambda: 1500)
+        ratings = self.ratings
+        
+        # 処理済みのグループを格納するリスト
+        processed_groups = []
+        
+        # groupbyオブジェクトを一度だけ作成
+        grouped = df.groupby("id_for_fold", observed=True, sort=False)
+        
+        for race_id, group in grouped:
+            # groupをコピーして変更を加えることで、元のDataFrameへの意図しない変更を防ぐ
+            group_copy = group.copy()
+
+            # --- 1. レース前Eloレーティングを効率的に記録 ---
+            # .map()は辞書を使った高速な値のマッピングを提供します
+            group_copy[f"{prefix}_EloRating"] = group_copy[target_col].map(ratings)
+
+            # Elo計算対象の正常なレースデータ
+            race_data = group_copy[group_copy["error_code"] == 0]
+            
+            # 出走頭数が2頭未満の場合はEloの変動なし
+            if len(race_data) < 2:
+                group_copy[f"{prefix}_EloRating_after_racing"] = group_copy[f"{prefix}_EloRating"]
+                processed_groups.append(group_copy)
+                continue
+
+            # --- 2. NumPyによるElo計算のベクトル化 ---
+            # 必要なデータをNumPy配列として抽出
+            horses = race_data[target_col].values
+            ranks = race_data["rank"].values
+            pre_ratings = race_data[f"{prefix}_EloRating"].values
+            
+            n_horses = len(horses)
+            K_modified = K / (n_horses - 1)
+
+            # 全ての馬のペアのインデックスを一度に生成
+            # np.triu_indicesはcombinations(range(n_horses), 2)と等価なインデックスペアを高速に生成します
+            idx_i, idx_j = np.triu_indices(n_horses, k=1)
+
+            # ペアごとのレーティングと着順をベクトルとして取得
+            R_i, R_j = pre_ratings[idx_i], pre_ratings[idx_j]
+            rank_i, rank_j = ranks[idx_i], ranks[idx_j]
+
+            # 期待勝率E_iをベクトル演算で一括計算
+            E_i = 1 / (1 + 10 ** ((R_j - R_i) / 400))
+            
+            # 実際の勝敗S_iをベクトル演算で一括計算
+            # np.whereを使って条件分岐を効率的に処理します
+            # np.where(条件（配列同士で比較）, Trueの時の値, Falseの時の値) -> np.array
+            S_i = np.where(rank_i < rank_j, 1.0, np.where(rank_i > rank_j, 0.0, 0.5))
+
+            # 各ペアにおけるEloレーティングの変動値を一括計算
+            delta_for_i = K_modified * (S_i - E_i)
+            
+            # 各馬の総変動値を計算
+            # np.add.atは、同じインデックスに対して値を安全に加算できるため、
+            # 各馬が複数のペアに含まれる場合の合計デルタを計算するのに適しています。
+            delta_array = np.zeros(n_horses, dtype=np.float64)
+            np.add.at(delta_array, idx_i, delta_for_i)
+            np.add.at(delta_array, idx_j, -delta_for_i) # delta_j は -delta_i となります
+
+            # --- 3. レーティングの一括更新 ---
+            for i, horse in enumerate(horses):
+                ratings[horse] += delta_array[i]
+
+            # --- 4. レース後Eloレーティングを効率的に記録 ---
+            group_copy[f"{prefix}_EloRating_after_racing"] = group_copy[target_col].map(ratings)
+            
+            processed_groups.append(group_copy)
+
+        # --- 5. 最後に処理済みグループを一度に結合 ---
+        # .sort_values(by="datetime")で安全性を確保
+        result_df = pd.concat(processed_groups).sort_values(by="datetime", ascending=True)
+
+        return result_df, new_feature_col
+    
+
+    # 出走前レース用の関数
+    def transform(self, df, feature_col):
+        df = df.copy()
+        feature_col = feature_col.copy()
+
+        ratings = self.ratings
+        target_col = self.target_col
+        prefix = self.prefix
+
+        df[f"{prefix}_EloRating"] = df[target_col].map(ratings)
+        feature_col.append(f"{prefix}_EloRating")
+
+        return df, feature_col
+    
+
+
+# Glicko2を計算する関数
+class glicko2_calculator:
+    def __init__(self, target_col=None, prefix=None):
+        if (target_col is None) or (prefix is None):
+            raise ValueError("target_col and prefix must be specified")
+        
+        self.target_col = target_col
+        self.prefix = prefix
+
+    
+    def fit_transform(self, df, feature_col):
+        df = df.copy()
+        feature_col = feature_col.copy()
+        df = df.sort_values("datetime").reset_index(drop=True)
+
+        # パラメータの設定
+        conf_mult=3.0
+        rd_cap=350.0
+        rd_floor=30.0
+        init_mu=1500.0
+        init_rd=250.0
+        init_vol=0.06
+        rating_period_days=30
+
+        target_col = self.target_col
+        prefix = self.prefix
+
+        # 列の初期化
+        main  = f"{prefix}_Glicko2"
+        rd    = f"{prefix}_Glicko2_RD"
+        gmin  = f"{prefix}_Glicko2_min"
+        gmax  = f"{prefix}_Glicko2_max"
+        after = f"{prefix}_Glicko2_after_racing"
+        df[[main, rd, gmin, gmax, after]] = np.nan
+        feature_col.extend([main, rd, gmin, gmax])
+
+        # Glicko2環境の設定
+        self.ratings = defaultdict(lambda: Player(rating=init_mu, rd=init_rd, vol=init_vol))
+        players = self.ratings
+        self.last_played = dict()
+        last_played = self.last_played
+
+        for race_id, group in df.groupby("id_for_fold", observed=True):
+            race_date = group["datetime"].iloc[0]
+            horses_all = group[target_col].tolist()
+
+            # 経過日数による RD 拡散
+            for h in horses_all:
+                if h in last_played:
+                    diff_days = (race_date - last_played[h]).days
+                    n_periods = diff_days // rating_period_days
+                    for _ in range(int(n_periods)):
+                        players[h].did_not_compete()
+
+            # レース前レーティングの埋め込み（全馬対象）
+            mu_pre = np.array([players[h].getRating() for h in horses_all])
+            rd_pre = np.array([np.clip(players[h].getRd(), rd_floor, rd_cap) for h in horses_all])
+            idx = group.index
+            df.loc[idx, main] = mu_pre
+            df.loc[idx, rd]   = rd_pre
+            df.loc[idx, gmin] = mu_pre - conf_mult * rd_pre
+            df.loc[idx, gmax] = mu_pre + conf_mult * rd_pre
+
+            # 正常な馬のみでレート更新
+            race = group[group["error_code"] == 0]
+            horses_valid, ranks = race[target_col].tolist(), race["rank"].tolist()
+            if len(horses_valid) < 2:
+                # 出走日だけ記録して終わり
+                for h in horses_valid:
+                    last_played[h] = race_date
+                continue
+
+            # 勝敗作成
+            update_args = {h: ([], [], []) for h in horses_valid}
+            for (h_i, r_i), (h_j, r_j) in combinations(zip(horses_valid, ranks), 2):
+                s_i, s_j = (1.0, 0.0) if r_i < r_j else (0.0, 1.0) if r_i > r_j else (0.5, 0.5)
+                update_args[h_i][0].append(players[h_j].getRating())
+                update_args[h_i][1].append(np.clip(players[h_j].getRd(), rd_floor, rd_cap))
+                update_args[h_i][2].append(s_i)
+                update_args[h_j][0].append(players[h_i].getRating())
+                update_args[h_j][1].append(np.clip(players[h_i].getRd(), rd_floor, rd_cap))
+                update_args[h_j][2].append(s_j)
+
+            # 一括更新
+            for h, (opp_r, opp_rd, score) in update_args.items():
+                try:
+                    players[h].update_player(opp_r, opp_rd, score)
+                except ZeroDivisionError:
+                    pass
+                last_played[h] = race_date
+
+            # レース後レーティングの埋め込み（全馬対象）
+            mu_after = np.array([players[h].getRating() for h in horses_all])
+            df.loc[idx, after] = mu_after
+
+        return df, feature_col
+    
+
+    # 新しいレース用のレーディング埋め込み関数(1レースずつ)
+    def transform(self, df, feature_col):
+        df = df.copy()
+        feature_col = feature_col.copy()
+        
+        target_col = self.target_col
+        prefix = self.prefix
+
+        # パラメータの設定
+        conf_mult=3.0
+        rd_cap=350.0
+        rd_floor=30.0
+        rating_period_days=30
+
+        main  = f"{prefix}_Glicko2"
+        rd    = f"{prefix}_Glicko2_RD"
+        gmin  = f"{prefix}_Glicko2_min"
+        gmax  = f"{prefix}_Glicko2_max"
+
+        players = self.ratings
+        last_played = self.last_played
+        race_date = df["datetime"].iloc[0]
+        horses_all = df[target_col].tolist()
+
+        # RDの拡散
+        # 経過日数による RD 拡散
+        for h in horses_all:
+            if h in last_played:
+                diff_days = (race_date - last_played[h]).days
+                n_periods = diff_days // rating_period_days
+                for _ in range(int(n_periods)):
+                    players[h].did_not_compete()
+
+
+        mu_pre = np.array([players[h].getRating() for h in horses_all])
+        rd_pre = np.array([np.clip(players[h].getRd(), rd_floor, rd_cap) for h in horses_all])
+        idx = df.index
+        df.loc[idx, main] = mu_pre
+        df.loc[idx, rd]   = rd_pre
+        df.loc[idx, gmin] = mu_pre - conf_mult * rd_pre
+        df.loc[idx, gmax] = mu_pre + conf_mult * rd_pre
+
+        feature_col.extend([main, rd, gmin, gmax])
+
+        return df, feature_col

@@ -12,7 +12,7 @@ import sys
 module_path = (Path().resolve().parent/ "Modules")
 sys.path.append(str(module_path))
 
-from skill_calculators import trueskill_calcluator
+from skill_calculators import trueskill_calculator, elorating_calculator, glicko2_calculator
 
 pd.option_context(
         'display.max_info_rows', None,     # 行しきい値を無制限
@@ -114,24 +114,27 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="
     df = df.drop(["last_race_date", "interval"], axis=1)
     feature_col.append("interval_day")
 
-
+    # --- レートの計算ここから --- 
     # TrueSkillの計算
     print("calculating horse trueskill is in progress")
-    horse_ts_calculator = trueskill_calcluator("horse", "horse")
+    horse_ts_calculator = trueskill_calculator("horse", "horse")
     df, feature_col = horse_ts_calculator.fit_transform(df, feature_col) ###
-    
     print("calculating jockey trueskill is in progress")
-    jockey_ts_calculator = trueskill_calcluator("jockey_id", "jockey")
+    jockey_ts_calculator = trueskill_calculator("jockey_id", "jockey")
     df, feature_col = jockey_ts_calculator.fit_transform(df, feature_col) ###
 
     # EloRatingの計算
-    print("calculating EloRating is in progress")
-    df, feature_col = calc_elo_rating_fast(df, feature_col, target_col="horse", prefix="horse")
-    df, feature_col = calc_elo_rating_fast(df, feature_col, target_col="jockey_id", prefix="jockey")
+    print("calculating horse EloRating is in progress")
+    horse_er_calculator = elorating_calculator(target_col="horse", prefix="horse")
+    df, feature_col = horse_er_calculator.fit_transform(df, feature_col)
+    print("calculating jockey EloRating is in progress")
+    jockey_er_calculator = elorating_calculator(target_col="jockey_id", prefix="jockey")
+    df, feature_col = jockey_er_calculator.fit_transform(df, feature_col)
 
     # Glicko2の計算
     print("calculating Glicko2 is in progress")
-    df, feature_col = calc_glicko2_common(df, feature_col, target_col="horse", prefix="horse")
+    horse_g2_calculator = glicko2_calculator(target_col="horse", prefix="horse")
+    df, feature_col = horse_g2_calculator.fit_transform(df, feature_col)
     #jockeyの部分は、なぜかエラーが出るので、gitからソースコードを引っ張ってきて、それを直接直そうと思う。
     #df, feature_col = calc_glicko2_common(df, feature_col, target_col="jockey_id", prefix="jockey") 
 
@@ -159,6 +162,8 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="
     df = pd.concat([df, poly_features_df[interaction_cols]], axis=1)
 
     print("poly calculated")
+
+    # --- レートの計算ここまで ---
 
 
     # 過去に特定グループ内のレーティングの平均がいくつか計算する関数
@@ -540,263 +545,6 @@ def calc_mean_race_development(df_to_copy, feature_col_to_copy, target_col=None,
 
     df[feature_name] = bunsi1 / bunbo1.replace(0, np.nan) 
     feature_col.append(feature_name)
-
-    return df, feature_col
-
-
-# TrueSKillを計算する関数
-def calc_trueskill_fast(df_to_copy, feature_col, target_col, prefix):
-    """
-    TrueSkill計算を効率的なDataFrame操作で高速化したバージョン。
-    """
-    if (target_col is None) or (prefix is None):
-        raise ValueError("target_col and prefix must be specified")
-
-    df = df_to_copy.copy()
-    
-    # 元のfeature_colリストを変更しないように新しいリストを作成
-    new_feature_col = feature_col.copy()
-
-    CONFIDENCE_MULTIPLIER = 3 # シグマ範囲を設定
-
-    # 新しく追加する列名を事前に定義
-    ts_mu_col = f"{prefix}_TrueSkill"
-    ts_sigma_col = f"{prefix}_TrueSkill_sigma"
-    ts_min_col = f"{prefix}_TrueSkill_min"
-    ts_max_col = f"{prefix}_TrueSkill_max"
-    ts_after_col = f"{prefix}_TrueSkill_after_racing"
-    
-    # 新しい特徴量をリストに追加
-    new_feature_col.extend([ts_mu_col, ts_sigma_col, ts_min_col, ts_max_col])
-
-    # TrueSkill環境とレーティング辞書を初期化
-    env = TrueSkill(draw_probability=0.0)
-    ratings = defaultdict(lambda: env.create_rating())
-
-    # 処理済みのグループを格納するリスト
-    processed_groups = []
-    
-    # groupbyオブジェクトを作成（sort=Falseで元の順序を維持）
-    grouped = df.groupby("id_for_fold", observed=True, sort=False)
-
-    for race_id, group in grouped:
-        # 各グループのコピーに対して変更を加える
-        group_copy = group.copy()
-        
-        all_targets = group_copy[target_col]
-
-        # --- 1. レース前TrueSkillを効率的に記録 ---
-        # .map()とlambda式を使い、辞書からmuとsigmaの値を高速に取得
-        mu_series = all_targets.map(lambda x: ratings[x].mu)
-        sigma_series = all_targets.map(lambda x: ratings[x].sigma)
-
-        # 取得したSeriesをDataFrameの列として一括で代入
-        group_copy[ts_mu_col] = mu_series
-        group_copy[ts_sigma_col] = sigma_series
-        
-        # min/maxをベクトル演算で効率的に計算
-        group_copy[ts_min_col] = mu_series - sigma_series * CONFIDENCE_MULTIPLIER
-        group_copy[ts_max_col] = mu_series + sigma_series * CONFIDENCE_MULTIPLIER
-
-        # --- 2. TrueSkill計算とレーティング更新 ---
-        # 正常なレースデータのみを対象
-        race_data = group_copy[group_copy["error_code"] == 0]
-        
-        # 意味のあるレーティング更新は、通常2つ以上のエンティティが存在する場合
-        if len(race_data) >= 2:
-            target_list = race_data[target_col].tolist()
-            # ratings辞書から現在のレーティングオブジェクトのリストを作成
-            race_ratings = [[ratings[target]] for target in target_list]
-            ranks = race_data["rank"].tolist()
-
-            # TrueSkillライブラリで新しいレーティングを計算
-            new_ratings = env.rate(race_ratings, ranks=ranks)
-
-            # ratings辞書を新しいレーティングで更新
-            for target, new_rating_tuple in zip(target_list, new_ratings):
-                ratings[target] = new_rating_tuple[0]
-        
-        # --- 3. レース後TrueSkillを効率的に記録 ---
-        # 更新後のratings辞書からmuの値を.map()で取得
-        group_copy[ts_after_col] = all_targets.map(lambda x: ratings[x].mu)
-
-        # 処理済みのグループをリストに追加
-        processed_groups.append(group_copy)
-
-    # --- 4. 最後に処理済みグループを一度に結合 ---
-    # .sort_values(by="datetime")で安全性を確保
-    result_df = pd.concat(processed_groups).sort_values(by="datetime", ascending=True)
-
-    return result_df, new_feature_col
-
-
-
-# Elo Rating の計算用の関数
-def calc_elo_rating_fast(df_to_copy, feature_col, K=32, target_col=None, prefix=None):
-    """
-    Eloレーティング計算をNumPyによるベクトル化と効率的なDataFrame操作で高速化したバージョン。
-    """
-    if (target_col is None) or (prefix is None):
-        raise ValueError("target_col and prefix must be specified")
-
-    df = df_to_copy.copy()
-    
-    # 元のfeature_colリストを変更しないように新しいリストを作成
-    new_feature_col = feature_col.copy()
-    new_feature_col.append(f"{prefix}_EloRating")
-
-    # レート保存用辞書
-    ratings = defaultdict(lambda: 1500)
-    
-    # 処理済みのグループを格納するリスト
-    processed_groups = []
-    
-    # groupbyオブジェクトを一度だけ作成
-    grouped = df.groupby("id_for_fold", observed=True, sort=False)
-    
-    for race_id, group in grouped:
-        # groupをコピーして変更を加えることで、元のDataFrameへの意図しない変更を防ぐ
-        group_copy = group.copy()
-
-        # --- 1. レース前Eloレーティングを効率的に記録 ---
-        # .map()は辞書を使った高速な値のマッピングを提供します
-        group_copy[f"{prefix}_EloRating"] = group_copy[target_col].map(ratings)
-
-        # Elo計算対象の正常なレースデータ
-        race_data = group_copy[group_copy["error_code"] == 0]
-        
-        # 出走頭数が2頭未満の場合はEloの変動なし
-        if len(race_data) < 2:
-            group_copy[f"{prefix}_EloRating_after_racing"] = group_copy[f"{prefix}_EloRating"]
-            processed_groups.append(group_copy)
-            continue
-
-        # --- 2. NumPyによるElo計算のベクトル化 ---
-        # 必要なデータをNumPy配列として抽出
-        horses = race_data[target_col].values
-        ranks = race_data["rank"].values
-        pre_ratings = race_data[f"{prefix}_EloRating"].values
-        
-        n_horses = len(horses)
-        K_modified = K / (n_horses - 1)
-
-        # 全ての馬のペアのインデックスを一度に生成
-        # np.triu_indicesはcombinations(range(n_horses), 2)と等価なインデックスペアを高速に生成します
-        idx_i, idx_j = np.triu_indices(n_horses, k=1)
-
-        # ペアごとのレーティングと着順をベクトルとして取得
-        R_i, R_j = pre_ratings[idx_i], pre_ratings[idx_j]
-        rank_i, rank_j = ranks[idx_i], ranks[idx_j]
-
-        # 期待勝率E_iをベクトル演算で一括計算
-        E_i = 1 / (1 + 10 ** ((R_j - R_i) / 400))
-        
-        # 実際の勝敗S_iをベクトル演算で一括計算
-        # np.whereを使って条件分岐を効率的に処理します
-        # np.where(条件（配列同士で比較）, Trueの時の値, Falseの時の値) -> np.array
-        S_i = np.where(rank_i < rank_j, 1.0, np.where(rank_i > rank_j, 0.0, 0.5))
-
-        # 各ペアにおけるEloレーティングの変動値を一括計算
-        delta_for_i = K_modified * (S_i - E_i)
-        
-        # 各馬の総変動値を計算
-        # np.add.atは、同じインデックスに対して値を安全に加算できるため、
-        # 各馬が複数のペアに含まれる場合の合計デルタを計算するのに適しています。
-        delta_array = np.zeros(n_horses, dtype=np.float64)
-        np.add.at(delta_array, idx_i, delta_for_i)
-        np.add.at(delta_array, idx_j, -delta_for_i) # delta_j は -delta_i となります
-
-        # --- 3. レーティングの一括更新 ---
-        for i, horse in enumerate(horses):
-            ratings[horse] += delta_array[i]
-
-        # --- 4. レース後Eloレーティングを効率的に記録 ---
-        group_copy[f"{prefix}_EloRating_after_racing"] = group_copy[target_col].map(ratings)
-        
-        processed_groups.append(group_copy)
-
-    # --- 5. 最後に処理済みグループを一度に結合 ---
-    # .sort_values(by="datetime")で安全性を確保
-    result_df = pd.concat(processed_groups).sort_values(by="datetime", ascending=True)
-
-    return result_df, new_feature_col
-
-
-
-# glicko2を計算する関数(なぜかNanの列が存在するので要確認)
-def calc_glicko2_common(
-    df_to_copy, feature_col, target_col, prefix,
-    *, conf_mult=3.0, rd_cap=350.0, rd_floor=30.0,
-    init_mu=1500.0, init_rd=250.0, init_vol=0.06,
-    rating_period_days=30
-):
-    df = df_to_copy.copy()
-    feature_col = feature_col.copy()
-    df = df.sort_values("datetime").reset_index(drop=True)
-
-    main  = f"{prefix}_Glicko2"
-    rd    = f"{prefix}_Glicko2_RD"
-    gmin  = f"{prefix}_Glicko2_min"
-    gmax  = f"{prefix}_Glicko2_max"
-    after = f"{prefix}_Glicko2_after_racing"
-    df[[main, rd, gmin, gmax, after]] = np.nan
-    feature_col.extend([main, rd, gmin, gmax])
-
-    players = defaultdict(lambda: Player(rating=init_mu, rd=init_rd, vol=init_vol))
-    last_played = dict()
-
-    for race_id, group in df.groupby("id_for_fold", observed=True):
-        race_date = group["datetime"].iloc[0]
-        horses_all = group[target_col].tolist()
-
-        # 経過日数による RD 拡散
-        for h in horses_all:
-            if h in last_played:
-                diff_days = (race_date - last_played[h]).days
-                n_periods = diff_days // rating_period_days
-                for _ in range(int(n_periods)):
-                    players[h].did_not_compete()
-
-        # レース前レーティングの埋め込み（全馬対象）
-        mu_pre = np.array([players[h].getRating() for h in horses_all])
-        rd_pre = np.array([np.clip(players[h].getRd(), rd_floor, rd_cap) for h in horses_all])
-        idx = group.index
-        df.loc[idx, main] = mu_pre
-        df.loc[idx, rd]   = rd_pre
-        df.loc[idx, gmin] = mu_pre - conf_mult * rd_pre
-        df.loc[idx, gmax] = mu_pre + conf_mult * rd_pre
-
-        # 正常な馬のみでレート更新
-        race = group[group["error_code"] == 0]
-        horses_valid, ranks = race[target_col].tolist(), race["rank"].tolist()
-        if len(horses_valid) < 2:
-            # 出走日だけ記録して終わり
-            for h in horses_valid:
-                last_played[h] = race_date
-            continue
-
-        # 勝敗作成
-        update_args = {h: ([], [], []) for h in horses_valid}
-        for (h_i, r_i), (h_j, r_j) in combinations(zip(horses_valid, ranks), 2):
-            s_i, s_j = (1.0, 0.0) if r_i < r_j else (0.0, 1.0) if r_i > r_j else (0.5, 0.5)
-            update_args[h_i][0].append(players[h_j].getRating())
-            update_args[h_i][1].append(np.clip(players[h_j].getRd(), rd_floor, rd_cap))
-            update_args[h_i][2].append(s_i)
-            update_args[h_j][0].append(players[h_i].getRating())
-            update_args[h_j][1].append(np.clip(players[h_i].getRd(), rd_floor, rd_cap))
-            update_args[h_j][2].append(s_j)
-
-        # 一括更新
-        for h, (opp_r, opp_rd, score) in update_args.items():
-            try:
-                players[h].update_player(opp_r, opp_rd, score)
-            except ZeroDivisionError:
-                pass
-            last_played[h] = race_date
-
-        # レース後レーティングの埋め込み（全馬対象）
-        mu_after = np.array([players[h].getRating() for h in horses_all])
-        df.loc[idx, after] = mu_after
 
     return df, feature_col
 
