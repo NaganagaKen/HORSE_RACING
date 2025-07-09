@@ -1,18 +1,11 @@
 import numpy as np
 import pandas as pd
 from IPython.display import display
-from trueskill import TrueSkill
-from itertools import combinations
-from collections import defaultdict
-from glicko2 import Player
-from sklearn.preprocessing import PolynomialFeatures
 from pathlib import Path
 import sys
 
 module_path = (Path().resolve().parent/ "Modules")
 sys.path.append(str(module_path))
-
-from skill_calculators import trueskill_calculator, elorating_calculator, glicko2_calculator
 
 pd.option_context(
         'display.max_info_rows', None,     # 行しきい値を無制限
@@ -20,18 +13,18 @@ pd.option_context(
         )
 
 
-# 勝率予測用特徴量エンジニアリング関数
-def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="../Data/tansho/tansho_2021_2025.csv"):
+# レーティング以外の特徴量エンジニアリング関数
+def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=None, tansho_odds_path="../Data/tansho/tansho_2021_2025.csv"):
     if feature_col_to_copy == None :
         # ブリンカーはあまり重要ではなさそうなので入れない
         feature_col_to_copy = ["waku_num", "horse_num", "sex", "age", "basis_weight", "weight", "inc_dec"]
     if tansho_odds_path is None:
         raise ValueError("Error in merge_last_N_odds: tansho_odds_path must be specified")
+    if ranking_col is None:
+        raise ValueError("ranking_col is not specified")
 
     feature_col = feature_col_to_copy.copy()
     df = df_to_copy.copy()
-
-    ranking_col = [] # ランキング化する特徴量の名前を入れるリスト（特に重要な特徴量はランキング化する）
 
     # 直近3レースの結果とその平均, 過去全てのレースの記録の平均を追加（PCIとRPCIはあまり重要ではなさそう）
     last_race_col = ["weight", "inc_dec", "last_3F_time", "Ave_3F"]
@@ -113,57 +106,6 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="
     df["interval_day"] = df["interval"].dt.days
     df = df.drop(["last_race_date", "interval"], axis=1)
     feature_col.append("interval_day")
-
-    # --- レートの計算ここから --- 
-    # TrueSkillの計算
-    print("calculating horse trueskill is in progress")
-    horse_ts_calculator = trueskill_calculator("horse", "horse")
-    df, feature_col = horse_ts_calculator.fit_transform(df, feature_col) ###
-    print("calculating jockey trueskill is in progress")
-    jockey_ts_calculator = trueskill_calculator("jockey_id", "jockey")
-    df, feature_col = jockey_ts_calculator.fit_transform(df, feature_col) ###
-
-    # EloRatingの計算
-    print("calculating horse EloRating is in progress")
-    horse_er_calculator = elorating_calculator(target_col="horse", prefix="horse")
-    df, feature_col = horse_er_calculator.fit_transform(df, feature_col)
-    print("calculating jockey EloRating is in progress")
-    jockey_er_calculator = elorating_calculator(target_col="jockey_id", prefix="jockey")
-    df, feature_col = jockey_er_calculator.fit_transform(df, feature_col)
-
-    # Glicko2の計算
-    print("calculating Glicko2 is in progress")
-    horse_g2_calculator = glicko2_calculator(target_col="horse", prefix="horse")
-    df, feature_col = horse_g2_calculator.fit_transform(df, feature_col)
-    #jockeyの部分は、なぜかエラーが出るので、gitからソースコードを引っ張ってきて、それを直接直そうと思う。
-    #df, feature_col = calc_glicko2_common(df, feature_col, target_col="jockey_id", prefix="jockey") 
-
-    # 各レートの上昇量を計算
-    rating_diff_list = ['horse_TrueSkill', 'jockey_TrueSkill', 'horse_EloRating', 'jockey_EloRating', 'horse_Glicko2'] # 空白区切り
-    for col in rating_diff_list:
-        df, feature_col = calc_rating_diff(df, feature_col, target_col=col, prefix=col)
-
-
-    # レーティングの相互作用特徴量を追加
-    poly = PolynomialFeatures(degree=2, include_bias=False, interaction_only=True)
-    poly_list = ['horse_TrueSkill', 'horse_TrueSkill_min',
-                        'horse_TrueSkill_max', 'jockey_TrueSkill',
-                        'jockey_TrueSkill_min', 'jockey_TrueSkill_max', 'horse_EloRating', 
-                        'jockey_EloRating', 'horse_Glicko2',
-                        'horse_Glicko2_min', 'horse_Glicko2_max']
-    poly_features = poly.fit_transform(df[poly_list])
-    poly_features_name = poly.get_feature_names_out(poly_list)
-    poly_features_df = pd.DataFrame(poly_features, columns=poly_features_name, index=df.index)
-
-    # 15 個の元列だけ除外してから結合（PolynomialFeaturesは相互作用を計算しないものまで含めてしまう）
-    interaction_cols = [c for c in poly_features_name if c not in poly_list]
-    feature_col.extend(interaction_cols)
-    ranking_col.extend(["jockey_TrueSkill horse_Glicko2", "jockey_TrueSkill_min horse_Glicko2", "jockey_TrueSkill_max horse_Glicko2"])
-    df = pd.concat([df, poly_features_df[interaction_cols]], axis=1)
-
-    print("poly calculated")
-
-    # --- レートの計算ここまで ---
 
 
     # 過去に特定グループ内のレーティングの平均がいくつか計算する関数
@@ -371,6 +313,10 @@ def feature_engineering(df_to_copy, feature_col_to_copy=None, tansho_odds_path="
 
     print("calculated rankings")
 
+    # cold start問題を解決するために、最初2年分のデータを切り捨てる。
+    years = sorted(df["year"].unique())
+    df = df[df.year > years[1]]
+
     # dfを表示
     print(feature_col)
     display(df.tail())
@@ -549,21 +495,7 @@ def calc_mean_race_development(df_to_copy, feature_col_to_copy, target_col=None,
     return df, feature_col
 
 
-# レーティングの上昇量を計算
-def calc_rating_diff(df, feature_col, target_col=None, prefix=None):
-    if (target_col is None) or (prefix is None):
-        raise ValueError("target_col and prefix must be selected")
-    
-    df = df.copy()
-    feature_col = feature_col.copy()
 
-    last_trueskill = df.groupby("horse", observed=True)[target_col]
-    for i in [1, 3]:
-        feature_name = f"{prefix}_diff_from_last{i}_racing"
-        df[feature_name] = df[target_col] - last_trueskill.shift(i)
-        feature_col.append(feature_name)
-
-    return df, feature_col
 
 
 # オッズデータと結合する関数
