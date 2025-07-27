@@ -87,6 +87,24 @@ def common_process(df_to_copy):
     # とりあえず平地レースだけを使用
     df = df[df["flat_or_jump"] == "平地"]
 
+
+    # 季節を追加
+    season_dict = {
+        1: "winter",
+        2: "winter",
+        3: "spring",
+        4: "spring",
+        5: "spring",
+        6: "summer",
+        7: "summer",
+        8: "summer",
+        9: "autumn",
+        10: "autumn",
+        11: "autumn",
+        12: "winter"
+    }
+    df["season"] = df["month"].replace(season_dict)
+
     # 年齢を2, 3, over4に分割してカテゴリ化する
     age_dict = {
         2: "2",
@@ -95,6 +113,7 @@ def common_process(df_to_copy):
     }
     df["age_type"] = df["age"].apply(lambda x: x if x < 4 else 4)
     df["age_type"] = df["age_type"].replace(age_dict)
+
 
     # 距離をビン分割する関数(SMILE区分)
     df["dist_type"] = pd.cut(df["dist"], [999, 1300, 1899, 2100, 2700, 5000], 

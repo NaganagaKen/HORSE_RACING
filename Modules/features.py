@@ -276,7 +276,7 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
 
     print("group_winning_rate_calculated")
 
-    # 過去オッズの追加(gainが高すぎるので一度加えないでおく)
+    # 過去オッズの追加
     df, feature_col = merge_last_N_odds(df, feature_col, tansho_odds_path=tansho_odds_path)
     ranking_col.append("tansho_odds_20")
     print("added last odds")
@@ -303,7 +303,7 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
 
     print("num_col are standardize")
 
-
+    # ↓ ここより下に正規化してほしくない特徴量を追加 ↓
     # ランキング特徴量
     group = df.groupby(["id_for_fold"], observed=True)
     
@@ -312,6 +312,18 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
         feature_col.append(f"{col}_ranking")
 
     print("calculated rankings")
+
+    # 日付データを追加
+    df["day_of_week"] = df["datetime"].dt.dayofweek
+    df["day_of_year"] = df["datetime"].dt.dayofyear
+    df["year_cos"] = np.cos((df["year"] - df["year"].min()) * 2 * np.pi / df["year"].nunique())
+    df["month_cos"] = np.cos((df["month"] - 1) * 2 * np.pi / 12)
+    df["day_cos"] = np.cos((df["day"] - 1) * 2 * np.pi / 31)
+    df["day_of_week_cos"] = np.cos(df["day_of_week"] * 2 * np.pi / 7)
+    df["day_of_year_cos"] = np.cos(df["day_of_year"] * 2 * np.pi / 365)
+
+    feature_col.extend(["month", "day", "day_of_week", "day_of_year", # <- month, dayもここで追加
+                        "year_cos", "month_cos", "day_cos", "day_of_week_cos", "day_of_year_cos"])
 
     # cold start問題を解決するために、最初2年分のデータを切り捨てる。
     years = sorted(df["year"].unique())
@@ -493,9 +505,6 @@ def calc_mean_race_development(df_to_copy, feature_col_to_copy, target_col=None,
     feature_col.append(feature_name)
 
     return df, feature_col
-
-
-
 
 
 # オッズデータと結合する関数

@@ -1,5 +1,6 @@
 from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
+from IPython.display import display
 import lightgbm as lgb
 
 
@@ -13,9 +14,12 @@ def select_from_model(df, feature_col):
     select_df = df[df["year"] <= unique_years[1]]
     ret_df = df[df["year"] > unique_years[1]]
 
-    cat_col = df[feature_col].select_dtypes(include=["object"]).columns.tolist()
-    for col in cat_col:
-        select_df[col] = select_df[col].astype("category")
+    select_df = select_df.loc[:, ~select_df.columns.duplicated()]
+    feature_col = list(dict.fromkeys(feature_col))            # 重複名を削除
+    feature_col = [c for c in feature_col if c in select_df.columns]
+
+    cat_col = select_df[feature_col].select_dtypes(include=["object"]).columns.tolist()
+    select_df[cat_col] = select_df[cat_col].astype("category")
 
     # モデルの定義
     params = {

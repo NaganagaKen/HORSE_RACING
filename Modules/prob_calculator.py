@@ -15,7 +15,8 @@ def calc_waku_pred(df_pred): # df_predが与えられる想定
 
     calced_df = []
 
-    for id in df_pred["id_for_fold"].unique(): # 1レースずつ計算
+    # 1レースずつ計算
+    for id in df_pred["id_for_fold"].unique():
         race_data = df_pred[df_pred.id_for_fold == id]
         
         # 各枠連の的中率を計算
