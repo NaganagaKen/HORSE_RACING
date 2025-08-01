@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
 from trueskill import TrueSkill
-from glicko2 import Player
+from myglicko2 import Player
 from collections import defaultdict
 from itertools import combinations
 
@@ -31,10 +31,13 @@ def all_rating_calculator(df, feature_col, ranking_col):
 
     # Glicko2の計算
     print("calculating Glicko2 is in progress")
-    horse_g2_calculator = glicko2_calculator(target_col="horse", prefix="horse")
+    horse_g2_calculator = glicko2_calculator(target_col="horse", prefix="horse", rating_period_days=30)
     df, feature_col = horse_g2_calculator.fit_transform(df, feature_col)
-    #jockeyの部分は、なぜかエラーが出るので、gitからソースコードを引っ張ってきて、それを直接直そうと思う。
-    #df, feature_col = calc_glicko2_common(df, feature_col, target_col="jockey_id", prefix="jockey") 
+    # jockey Glicko2は不安定なので、要改善
+    print("calculating jockey Glicko2 is in progress")
+    jockey_g2_calculator = glicko2_calculator(target_col="jockey_id", prefix="jockey", rating_period_days=14,
+                                         rd_cap=100, rd_floor=20, conf_mult=3.0)
+    df, feature_col = jockey_g2_calculator.fit_transform(df, feature_col)
 
     # 各レートの上昇量を計算
     rating_diff_list = ['horse_TrueSkill', 'jockey_TrueSkill', 'horse_EloRating', 'jockey_EloRating', 'horse_Glicko2'] # 空白区切り
@@ -44,11 +47,11 @@ def all_rating_calculator(df, feature_col, ranking_col):
 
     # レーティングの相互作用特徴量を追加
     poly = PolynomialFeatures(degree=2, include_bias=False, interaction_only=True)
-    poly_list = ['horse_TrueSkill', 'horse_TrueSkill_min',
-                        'horse_TrueSkill_max', 'jockey_TrueSkill',
-                        'jockey_TrueSkill_min', 'jockey_TrueSkill_max', 'horse_EloRating', 
-                        'jockey_EloRating', 'horse_Glicko2',
-                        'horse_Glicko2_min', 'horse_Glicko2_max']
+    poly_list = ['horse_TrueSkill', 'horse_TrueSkill_min', 'horse_TrueSkill_max',  # horseのTrueSkill
+                 'jockey_TrueSkill', 'jockey_TrueSkill_min', 'jockey_TrueSkill_max', # jockeyのTrueSkill
+                 'horse_EloRating', 'jockey_EloRating',  # EloRating
+                 'horse_Glicko2', 'horse_Glicko2_min', 'horse_Glicko2_max', # horseのGlicko2
+                 "jockey_Glicko2", "jockey_Glicko2_min", "jockey_Glicko2_max"] # jockeyのGlicko2
     poly_features = poly.fit_transform(df[poly_list])
     poly_features_name = poly.get_feature_names_out(poly_list)
     poly_features_df = pd.DataFrame(poly_features, columns=poly_features_name, index=df.index)
@@ -323,100 +326,94 @@ class elorating_calculator:
 
 # Glicko2を計算する関数
 class glicko2_calculator:
-    def __init__(self, target_col=None, prefix=None):
+    def __init__(self, target_col=None, prefix=None, rating_period_days=30,
+                 rd_cap=350.0, rd_floor=40.0, conf_mult=3.0):
         if (target_col is None) or (prefix is None):
             raise ValueError("target_col and prefix must be specified")
         
         self.target_col = target_col
         self.prefix = prefix
-
+        self.rating_period_days = rating_period_days
+        self.rd_cap = rd_cap
+        self.rd_floor = rd_floor
+        self.conf_mult = conf_mult
     
     def fit_transform(self, df, feature_col):
-        df = df.copy()
+        df = df.copy().sort_values("datetime").reset_index(drop=True)
+        df["date"] = df["datetime"].dt.floor("D")   # ← 1 日粒度キーを追加
         feature_col = feature_col.copy()
-        df = df.sort_values("datetime").reset_index(drop=True)
 
-        # パラメータの設定
-        conf_mult=3.0
-        rd_cap=350.0
-        rd_floor=30.0
-        init_mu=1500.0
-        init_rd=250.0
-        init_vol=0.06
-        rating_period_days=30
+        # ---------- 可視化パラメータ ----------
+        rating_floor = 1000.0       # 表示だけ下限 1000 に丸める
+        conf_mult = self.conf_mult
+        rd_cap    = self.rd_cap
+        rd_floor  = self.rd_floor
+        # --------------------------------------
 
-        target_col = self.target_col
-        prefix = self.prefix
+        main   = f"{self.prefix}_Glicko2"
+        viz    = f"{self.prefix}_Glicko2_viz"
+        rd_col = f"{self.prefix}_Glicko2_RD"
+        gmin   = f"{self.prefix}_Glicko2_min"
+        gmax   = f"{self.prefix}_Glicko2_max"
+        after  = f"{self.prefix}_Glicko2_after_racing"
+        df[[main, viz, rd_col, gmin, gmax, after]] = np.nan
+        feature_col.extend([main, rd_col, gmin, gmax])  # viz 列は学習に使わない
 
-        # 列の初期化
-        main  = f"{prefix}_Glicko2"
-        rd    = f"{prefix}_Glicko2_RD"
-        gmin  = f"{prefix}_Glicko2_min"
-        gmax  = f"{prefix}_Glicko2_max"
-        after = f"{prefix}_Glicko2_after_racing"
-        df[[main, rd, gmin, gmax, after]] = np.nan
-        feature_col.extend([main, rd, gmin, gmax])
+        # ---- プレイヤー初期化 ----
+        players = defaultdict(lambda: Player(rating=1500.0, rd=250.0, vol=0.06))
+        last_played = {}
 
-        # Glicko2環境の設定
-        self.ratings = defaultdict(lambda: Player(rating=init_mu, rd=init_rd, vol=init_vol))
-        players = self.ratings
-        self.last_played = dict()
-        last_played = self.last_played
-
-        for race_id, group in df.groupby("id_for_fold", observed=True):
-            race_date = group["datetime"].iloc[0]
-            horses_all = group[target_col].tolist()
-
-            # 経過日数による RD 拡散
-            for h in horses_all:
+        # ===== 1 日まとめて更新 =====
+        for day, day_grp in df.groupby("date", observed=True):
+            # ---------- RD 拡散 ----------
+            for h in day_grp[self.target_col].unique():
                 if h in last_played:
-                    diff_days = (race_date - last_played[h]).days
-                    n_periods = diff_days // rating_period_days
+                    diff_days = (day - last_played[h]).days
+                    n_periods = min(diff_days // self.rating_period_days, 6)
                     for _ in range(int(n_periods)):
                         players[h].did_not_compete()
 
-            # レース前レーティングの埋め込み（全馬対象）
-            mu_pre = np.array([players[h].getRating() for h in horses_all])
-            rd_pre = np.array([np.clip(players[h].getRd(), rd_floor, rd_cap) for h in horses_all])
-            idx = group.index
-            df.loc[idx, main] = mu_pre
-            df.loc[idx, rd]   = rd_pre
-            df.loc[idx, gmin] = mu_pre - conf_mult * rd_pre
-            df.loc[idx, gmax] = mu_pre + conf_mult * rd_pre
+            # ---------- レース前の埋め込み ----------
+            mu_raw = np.array([players[h].getRating() for h in day_grp[self.target_col]])
+            rd_pre = np.array([np.clip(players[h].getRd(), rd_floor, rd_cap)
+                               for h in day_grp[self.target_col]])
+            idx = day_grp.index
+            df.loc[idx, main] = mu_raw                 # 学習用（raw 値）
+            df.loc[idx, viz]  = np.clip(mu_raw, rating_floor, None)  # 可視化用
+            df.loc[idx, rd_col] = rd_pre
+            df.loc[idx, gmin] = mu_raw - conf_mult * rd_pre
+            df.loc[idx, gmax] = mu_raw + conf_mult * rd_pre
 
-            # 正常な馬のみでレート更新
-            race = group[group["error_code"] == 0]
-            horses_valid, ranks = race[target_col].tolist(), race["rank"].tolist()
-            if len(horses_valid) < 2:
-                # 出走日だけ記録して終わり
-                for h in horses_valid:
-                    last_played[h] = race_date
-                continue
+            # ---------- 1 日分の対戦ログを蓄積 ----------
+            daily_args = {h: ([], [], []) for h in day_grp[self.target_col].unique()}
 
-            # 勝敗作成
-            update_args = {h: ([], [], []) for h in horses_valid}
-            for (h_i, r_i), (h_j, r_j) in combinations(zip(horses_valid, ranks), 2):
-                s_i, s_j = (1.0, 0.0) if r_i < r_j else (0.0, 1.0) if r_i > r_j else (0.5, 0.5)
-                update_args[h_i][0].append(players[h_j].getRating())
-                update_args[h_i][1].append(np.clip(players[h_j].getRd(), rd_floor, rd_cap))
-                update_args[h_i][2].append(s_i)
-                update_args[h_j][0].append(players[h_i].getRating())
-                update_args[h_j][1].append(np.clip(players[h_i].getRd(), rd_floor, rd_cap))
-                update_args[h_j][2].append(s_j)
+            for _, race in day_grp.groupby("id_for_fold", observed=True):
+                race = race[race["error_code"] == 0]
+                horses, ranks = race[self.target_col].tolist(), race["rank"].tolist()
+                if len(horses) < 2:
+                    continue
 
-            # 一括更新
-            for h, (opp_r, opp_rd, score) in update_args.items():
-                try:
+                for (h_i, r_i), (h_j, r_j) in combinations(zip(horses, ranks), 2):
+                    s_i, s_j = (1.0, 0.0) if r_i < r_j else (0.0, 1.0) if r_i > r_j else (0.5, 0.5)
+                    daily_args[h_i][0].append(players[h_j].getRating())
+                    daily_args[h_i][1].append(np.clip(players[h_j].getRd(), rd_floor, rd_cap))
+                    daily_args[h_i][2].append(s_i)
+                    daily_args[h_j][0].append(players[h_i].getRating())
+                    daily_args[h_j][1].append(np.clip(players[h_i].getRd(), rd_floor, rd_cap))
+                    daily_args[h_j][2].append(s_j)
+
+            # ---------- 1 日 1 回だけの更新 ----------
+            for h, (opp_r, opp_rd, score) in daily_args.items():
+                if score:                       # 出走があれば更新
                     players[h].update_player(opp_r, opp_rd, score)
-                except ZeroDivisionError:
-                    pass
-                last_played[h] = race_date
+                    last_played[h] = day
 
-            # レース後レーティングの埋め込み（全馬対象）
-            mu_after = np.array([players[h].getRating() for h in horses_all])
+            # ---------- レース後の可視化値 ----------
+            mu_after = np.array([players[h].getRating() for h in day_grp[self.target_col]])
             df.loc[idx, after] = mu_after
 
         return df, feature_col
+
     
 
     # 新しいレース用のレーディング埋め込み関数(1レースずつ)
