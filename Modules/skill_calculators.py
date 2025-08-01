@@ -30,7 +30,7 @@ def all_rating_calculator(df, feature_col, ranking_col):
     df, feature_col = jockey_er_calculator.fit_transform(df, feature_col)
 
     # Glicko2の計算
-    print("calculating Glicko2 is in progress")
+    print("calculating horse Glicko2 is in progress")
     horse_g2_calculator = glicko2_calculator(target_col="horse", prefix="horse", rating_period_days=30)
     df, feature_col = horse_g2_calculator.fit_transform(df, feature_col)
     # jockey Glicko2は不安定なので、要改善

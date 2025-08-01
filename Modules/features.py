@@ -108,88 +108,7 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
     feature_col.append("interval_day")
 
 
-    # 過去に特定グループ内のレーティングの平均がいくつか計算する関数
-    # horse_TrueSkill
-    # father系
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "age_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "state"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "state", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "corner_num"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "place", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "jockey_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "trainer_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "race_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "mother"], target_name="horse_TrueSkill")
-
-    # mother系
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "age_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "state"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "state", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "corner_num"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "place", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "jockey_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "trainer_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["mother", "race_type"], target_name="horse_TrueSkill")
-
-    # broodmaresire系
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "age_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "state"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "state", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "corner_num"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "place", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "jockey_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "trainer_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["broodmare_sire", "race_type"], target_name="horse_TrueSkill")
-
-    # father x broodmaresire系
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "age_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "state"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "state", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "corner_num"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "place", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "dist"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "dist_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "turn_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "field_type"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "jockey_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "trainer_id"], target_name="horse_TrueSkill")
-    df, feature_col = calc_grouped_rating(df, feature_col, cols=["father", "broodmare_sire", "race_type"], target_name="horse_TrueSkill")
-
-    # 後でjockey_id, trainer_idも追加予定(waku系はgrouped_winning_rateで対応)
-
-    # horse_TrueSkillではなく、賞金によって適性を見る関数
+    # 賞金によって適性を見る関数
     df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["father"])
     df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["broodmare_sire"])
     df, feature_col = calc_lifetime_prize_cumsum(df, feature_col, cols=["mother"])
@@ -219,41 +138,109 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["class_code"]) ###
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["basis_weight"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["age_code"]) ###
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["age_type"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["waku"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["waku_num"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weight_code"]) ###
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id"]) ###
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["trainer_id"])
+
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "field_type"]) ###
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "season"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "weather"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["jockey_id", "place"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "waku"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "state"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "place"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "class_code", "waku"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "class_code", "state"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["weather", "class_code", "place"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "waku"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "class_code"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "weather"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "state"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "weather", "state"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "weather", "class_code"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "state", "class_code"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["season", "weather", "state", "class_code"])
+
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "corner_num"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "track_code"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "class_code"]) ###
-    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["place", "field_type", "dist"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "place"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "field_type"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "place", "class_code"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "waku"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "place", "waku"])
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist", "field_type", "waku"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist_type", "corner_num"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist_type", "track_code"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist_type", "class_code"]) ###
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["dist_type", "class_code", "place"])
     df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["place", "field_type", "dist_type"])
-
+    df, feature_col = grouped_horse_winning_rate(df, feature_col, cols=["place", "field_type", "dist"])  
     
     # 過去他の馬も含む全レースで同条件でのレースの1着の確率
-    # dist, field_type, place, race_type, corner_num系
+    # dist, field_type, place, race_type, corner_num, weather, state系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["season", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["state", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "field_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "state", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "state", "field_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "state", "place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["weather", "state", "place", "field_type", "waku"])
+
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["place", "waku"])
-    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["dist", "place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "place", "waku"]) ###
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "weather", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["field_type", "state", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["race_type", "waku"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "waku"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "dist", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "place", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["corner_num", "field_type", "waku"])
 
+    # turn_type系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["turn_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["turn_type", "field_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["turn_type", "place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["turn_type", "dist_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["turn_type", "field_type", "place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["turn_type", "field_type", "dist_type", "waku"])
+
     # jockey_id系
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "place"]) ###
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "dist_type"]) ###
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "corner_num"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "waku"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "season"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "weather"])
+
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "dist_type", "waku"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "corner_num", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "season", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "state", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "weather", "waku"])
+
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "weather", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "weather", "season"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "weather", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "weather", "state", "field_type"])
+
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "place", "dist"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "field_type"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "class_code", "field_type"]) ###
-
+    
     # jockey_id-turn_type系
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "turn_type"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "turn_type", "field_type"]) ###
@@ -262,13 +249,80 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "turn_type", "field_type", "waku"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["jockey_id", "turn_type", "dist", "place", "waku"])
 
+
     # trainer_id系(turn-typeと一緒に使うのは効果なし）)
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id"]) ###
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "place"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "race_type", "waku"])
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "class_code"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "class_code", "field_type"]) ###
     dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "class_code", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "weather"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "state", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "season"])
 
+    # jokey_id - trainer_id系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "class_code"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "class_code", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "class_code", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "weather"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "state", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["trainer_id", "jockey_id", "season"])
+
+    # owner系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "place"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "class_code"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "class_code", "field_type"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "class_code", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "weather"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "state", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["owner", "season"])
+
+    # breeding_farm系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "place"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "class_code"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "class_code", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "class_code", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "weather"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "state", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_farm", "season"])
+
+    # breeding_place系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place"]) 
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "place"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "class_code"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "class_code", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "class_code", "race_type", "waku"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "state"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "weather"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "state", "field_type"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["breeding_place", "season"])
+
+    # season系
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["season"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["season", "place"])
+    dict_for_df, feature_col = grouped_winning_rate(df, feature_col, dict_for_df, cols=["season", "sex"])
+    
 
     # 最後にまとめてdict_for_dfをdfにくっつける
     processed_df = pd.DataFrame(dict_for_df)
@@ -325,13 +379,16 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
     feature_col.extend(["month", "day", "day_of_week", "day_of_year", # <- month, dayもここで追加
                         "year_cos", "month_cos", "day_cos", "day_of_week_cos", "day_of_year_cos"])
 
-    # cold start問題を解決するために、最初2年分のデータを切り捨てる。
+    # cold start問題を解決するために、最初1年分のデータを切り捨てる。
     years = sorted(df["year"].unique())
-    df = df[df.year > years[1]]
+    df = df[df.year > years[0]]
 
     # dfを表示
     print(feature_col)
     display(df.tail())
+
+    # 重複列を表示
+    show_df_duplicate_columns(df)
 
     return df, feature_col
 
@@ -426,33 +483,6 @@ def grouped_winning_rate(df_to_copy, feature_col_to_copy, dict_for_df, cols):
     dict_for_df[feature_name3] = bunsi3 / bunbo3.replace(0, np.nan)
 
     return dict_for_df, feature_col
-
-
-# 過去に特定グループ内のレーティングの平均がいくつか計算する関数
-# 収束が速いので、とりあえずTrueSkillのみで計算を行う
-def calc_grouped_rating(df_to_copy, feature_col_to_copy, cols=None, target_name=None):
-    # cols: List ... グループを決めるための特徴量のリスト
-    # target_name: str ... どのレーティングのスコアを平均するかを指定する文字列
-    if cols == None:
-        raise ValueError("cols must be selected")
-    elif target_name == None or type(target_name) != str:
-        raise ValueError("target_col must be str")
-
-    df = df_to_copy.copy()
-    feature_col = feature_col_to_copy.copy()
-    target_col = target_name + "_after_racing"
-    grouped1 = df.groupby(cols, observed=True)
-    grouped2 = df.groupby(["id_for_fold", *cols], observed=True)
-
-    # 同じ条件で1着になるの確率を計算
-    bunsi1 = grouped1[target_col].cumsum() - grouped2[target_col].cumsum()
-    bunbo1 = grouped1[target_col].cumcount() - grouped2[target_col].cumcount()
-
-    feature_name = f"mean_{target_name}_in_group_" + "_".join(cols)
-    feature_col.append(feature_name)
-    df[feature_name] = bunsi1 / bunbo1.replace(0, np.nan)
-
-    return df, feature_col
 
 
 # 同じ条件の馬がどの程度の賞金を獲得しているのかの平均値を計算する関数

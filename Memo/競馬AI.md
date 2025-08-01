@@ -212,24 +212,29 @@
 ### 次の集会（8/6?）までにやっておくこと
 - [済] 日付の追加 (year, month, day, dayofweek, cosもそれぞれ追加)
 - [済] 季節 (season)を追加
-- [ ] Glicko2の計算方法を変える（他のライブラリを用いる）
-- [ ] TrueSkillの平均を出す関数(calc_grouped_rating)をやめる
-- [ ] grouped_winning_rateを用いた特徴量を増やす（特に以下の特徴量を用いて増やす）
-  - trainer_id
-  - owner
-  - breeding_farm
-  - breeding_place
-  - season
+- [済] Glicko2の計算方法を変える
+- [済] TrueSkillの平均を出す関数(calc_grouped_rating)をやめる
+- [済] 全ての数値特徴量に対して、ranking特徴量を追加する。
+  - 計算量の割にあまり改善しない。いつかもう一度やってみる
+- [済] grouped_winning_rateを用いた特徴量を増やす（特に以下の特徴量を用いて増やす）
+  - [済] trainer_id
+  - [済] owner
+  - [済] breeding_farm
+  - [済] breeding_place
+  - [済] season
+
+### 8/2やること
+- [ ] mother, father, bloodmaresire系を追加
+- [ ] 効いてなさそうな特徴量を削除する（gainに対して閾値を作成し、それ以下の特徴量は切り捨てる）
 
 ### いつかやること
 - [ ] 2008年度からの単勝、複勝オッズをダウンロードして、整理する。
 - [ ] 2008年度からのデータを使って学習させてみる。
 - [ ] 複勝のオッズとそのランキング特徴量を追加
-- [ ] OpenSkillを追加
 - [ ] float64をfloat32にしてメモリを節約する。 
-- [ ] 特徴量選択の方法をもう少しロバストにする（パラメータチューニングをちゃんとやる） 
-- [ ] feature_colの重複がないようにsetにするか重複時にエラーが出るようにする。
-- [ ] jockey_idでもGlicko2を計算できるようにする。
+- [ ] 特徴量選択の方法をもう少しロバストにする（パラメータチューニングをちゃんとやるか他の方法を考える） 
+- [済] feature_colの重複がないようにsetにするか重複時にエラーが出るようにする。（応急処置は完了(JV_eda.ipynb内に追加)）
+- [済] jockey_idでもGlicko2を計算できるようにする。（ただしバグあり）
 - [ ] DeepLearningとのスタッキング
 - [ ] 血統ベクトルの追加（nord2vecかFastTextか、あるいは両方）
   - [ ] ベクトルをUMAPでまとめて、k-meansを実行(エルボー法)
