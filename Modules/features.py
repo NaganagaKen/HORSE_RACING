@@ -104,7 +104,7 @@ def sub_feature_engineering(df_to_copy, feature_col_to_copy=None, ranking_col=No
     # 中何日か
     df["last_race_date"] = df.groupby("horse", observed=True)["datetime"].shift(1)
     df["interval"] = df["datetime"] - df["last_race_date"]
-    df["interval_day"] = df["interval"].dt.days ###
+    df["interval_day"] = df["interval"].dt.days ###]
     df = df.drop(["last_race_date", "interval"], axis=1)
     feature_col.append("interval_day")
 
